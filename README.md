@@ -88,7 +88,7 @@ EM Tokens provide the possibility to perform holds on tokens. A hold is created 
 * **status**: the status of the hold, which can be one of the following as defined in the ```HoldStatusCode``` enum type (also part of the standard)
 
 ```
-enum HoldStatusCode { Nonexistent, Created, ExecutedByNotary, ExecutedByOperator, ReleasedByNotary, ReleasedByOperator, ReleasedDueToExpiration }
+enum HoldStatusCode { Nonexistent, Created, ExecutedByNotary, ExecutedByOperator, ReleasedByNotary, ReleasedByPayee, ReleasedByOperator, ReleasedDueToExpiration }
 ```
 
 Holds are to be created directly by wallet owners. Wallet owners can also approve others to perform holds on their behalf:
