@@ -52,7 +52,7 @@ function version() external pure returns (string memory);
 
 The ```Created``` event is sent upon contract instantiation:
 ```
-event Created(string name, string symbol, string currency, uint8 decimals, string version);
+event Created(string indexed name, string indexed symbol, string indexed currency, uint8 decimals, string version);
 ```
 
 ### _ERC20 standard_
@@ -134,7 +134,7 @@ Also, some ```view``` methods are provided to retrieve information about holds:
 ```
 function isApprovedToHold(address wallet, address holder) external view returns (bool);
 function retrieveHoldData(address issuer, string calldata transactionId) external view returns (uint256 index, address from, address to, address notary, uint256 amount, bool expires, uint256 expiration, HoldStatusCode status);
-function balanceOnHold(address account) external view returns (uint256);
+function balanceOnHold(address wallet) external view returns (uint256);
 function totalSupplyOnHold() external view returns (uint256);
 ```
 
@@ -143,26 +143,61 @@ function totalSupplyOnHold() external view returns (uint256);
 A number of events are to be sent as well:
 
 ```
-event HoldCreated(address issuer, string indexed transactionId, address indexed from, address to, address indexed notary, uint256 amount, bool expires, uint256 expiration, uint256 index );
-event HoldExecuted(address issuer, string indexed transactionId, HoldStatusCode status);
-event HoldReleased(address issuer, string indexed transactionId, HoldStatusCode status);
-event HoldRenewed(address issuer, string indexed transactionId, uint256 oldExpiration, uint256 newExpiration);
+event HoldCreated(address indexed issuer, string indexed transactionId, address from, address to, address indexed notary, uint256 amount, bool expires, uint256 expiration, uint256 index );
+event HoldExecuted(address indexed issuer, string indexed transactionId, HoldStatusCode status);
+event HoldReleased(address indexed issuer, string indexed transactionId, HoldStatusCode status);
+event HoldRenewed(address indexed issuer, string indexed transactionId, uint256 oldExpiration, uint256 newExpiration);
 ```
 
 ### _Overdrafts_
 
-The EM Token implements the possibility of token balances to be negative through the implementation of unsecured overdraft lines subject to limits to be set by a CRO. Changes in overdraft limits results in sending events:
+The EM Token implements the possibility of token balances to be negative through the implementation of an unsecured overdraft line subject to limits and conditions to be set by a CRO. This credit line is subject to interest, which is to be charged at agreed-upon moments
+
+Overdraft lines are set up with two key parameters:
+- The **overdraft limit**, which is intended to be the maximum amount that should be drawn from the line. And
+- The **interest engine**, which is (the address of) a separate contract where interest conditions are set up, and trough which interest charges are taken by the lending institution.
+
+**(Interest engines to be defined in detail separately)**
+
+Basic ```view``` methods allow to know the limits and the drawn amounts from the credit line, as well as address of the current interest engine contract:
 
 ```
-event UnsecuredOverdraftLimitSet(address indexed account, uint256 oldLimit, uint256 newLimit);
+function unsecuredOverdraftLimit(address wallet) external view returns (uint256);
+function drawnAmount(address wallet) external view returns (uint256);
+function totalDrawnAmount() external view returns (uint256);
+function interestEngine(address wallet) external view returns (address);
 ```
 
-View methods allow to know the limits and the drawn amounts from the credit line:
+The limit of the credit line and interest engine can only be changed by the CRO:
 
 ```
-function unsecuredOverdraftLimit(address account) external view returns (uint256);
-function drawnAmount(address account) external view returns (uint256);
+function setUnsecuredOverdraftLimit(address wallet, uint256 newLimit) external returns (bool);
+function setInterestEngine(address wallet, address newEngine) external returns(bool);
 ```
+
+These actions result in events being sent:
+
+```
+event UnsecuredOverdraftLimitSet(address indexed wallet, uint256 oldLimit, uint256 newLimit);
+event InterestEngineSet(address indexed wallet, address indexed previousEngine, address indexed newEngine);
+```
+
+Interest can only be charged by the interest engine contract. To do so, the interest engine contract must call the ```chargeInterest``` method (the contract is the only one allowed to call this method). Note that interst can always be charged, even if the resulting drawn amount becomes larger than the established limit
+
+```
+function chargeInterest(address wallet, uint256 amount) external returns (bool);
+// Implementation starts with some like:
+// require(msg.sender == _interestEngine, "Only the interest engine can charge interest");
+```
+
+Charging interest results in an event being sent:
+
+```
+event interestCharged(address indexed wallet, address indexed engine, uint256 amount);
+```
+
+(events with more specific information about interest rates and charging periods can be sent in the interest engine contract)
+
 
 ### _Cleared transfers_
 
@@ -185,7 +220,7 @@ function orderClearedTransfer(string calldata transactionId, address to, uint256
 function orderClearedTransferFrom(string calldata transactionId, address from, address to, uint256 amount) external returns (uint256 index);
 ```
 
-Right after the transfer has been ordered (status is ```Requested```), the issuer can still cancel the transfer:
+Right after the transfer has been ordered (status is ```Requested```), the requester can still cancel the transfer:
 
 ```
 function cancelClearedTransferRequest(string calldata transactionId) external returns (bool);
@@ -193,7 +228,7 @@ function cancelClearedTransferRequest(string calldata transactionId) external re
 
 The token contract owner / operator has then methods to manage the workflow process:
 
-* The ```processClearedTransferRequest``` moves the status to ```InProcess```, which then forbids the issuer to be able to cancel the transfer request. This also can be used by the operator to freeze everything, e.g. in the case of a positive in AML screening
+* The ```processClearedTransferRequest``` moves the status to ```InProcess```, which then forbids the requester to be able to cancel the transfer request. This also can be used by the operator to freeze everything, e.g. in the case of a positive in AML screening
 
 ```
 function processClearedTransferRequest(address requester, string calldata transactionId) external returns (bool);
@@ -221,11 +256,11 @@ function retrieveClearedTransferData(address requester, string calldata transact
 A number of events are also casted on eventful transactions:
 
 ```
-event ClearedTransferRequested( address indexed requester, string indexed transactionId, address indexed fromWallet, address toWallet, uint256 amount, uint256 index );
-event ClearedTransferRequestInProcess(address requester, string indexed transactionId);
-event ClearedTransferRequestExecuted(address requester, string indexed transactionId);
-event ClearedTransferRequestRejected(address requester, string indexed transactionId, string reason);
-event ClearedTransferRequestCancelled(address requester, string indexed transactionId);
+event ClearedTransferRequested( address indexed requester, string indexed transactionId, address fromWallet, address toWallet, uint256 amount, uint256 index );
+event ClearedTransferRequestInProcess(address indexed requester, string indexed transactionId);
+event ClearedTransferRequestExecuted(address indexed requester, string indexed transactionId);
+event ClearedTransferRequestRejected(address indexed requester, string indexed transactionId, string reason);
+event ClearedTransferRequestCancelled(address indexed requester, string indexed transactionId);
 event ApprovalToRequestClearedTransfer(address indexed wallet, address indexed requester);
 event RevokeApprovalToRequestClearedTransfer(address indexed wallet, address indexed requester);
 ```
@@ -270,10 +305,10 @@ Events are to be sent on relevant transactions:
 
 ```
 event FundingRequested(address indexed requester, string indexed transactionId, address indexed walletToFund, uint256 amount, string instructions, uint256 index);
-event FundingRequestInProcess(address requester, string indexed transactionId);
-event FundingRequestExecuted(address requester, string indexed transactionId);
-event FundingRequestRejected(address requester, string indexed transactionId, string reason);
-event FundingRequestCancelled(address requester, string indexed transactionId);
+event FundingRequestInProcess(address indexed requester, string indexed transactionId);
+event FundingRequestExecuted(address indexed requester, string indexed transactionId);
+event FundingRequestRejected(address indexed requester, string indexed transactionId, string reason);
+event FundingRequestCancelled(address indexed requester, string indexed transactionId);
 event ApprovalToRequestFunding(address indexed walletToFund, address indexed requester);
 event RevokeApprovalToRequestFunding(address indexed walletToFund, address indexed requester);
 ```
@@ -321,10 +356,10 @@ Events are to be sent on relevant transactions:
 
 ```
 event PayoutRequested(address indexed requester, string indexed transactionId, address indexed walletToDebit, uint256 amount, string instructions, uint256 index);
-event PayoutRequestInProcess(address requester, string indexed transactionId);
-event PayoutRequestExecuted(address requester, string indexed transactionId);
-event PayoutRequestRejected(address requester, string indexed transactionId, string reason);
-event PayoutRequestCancelled(address requester, string indexed transactionId);
+event PayoutRequestInProcess(address indexed requester, string indexed transactionId);
+event PayoutRequestExecuted(address indexed requester, string indexed transactionId);
+event PayoutRequestRejected(address indexed requester, string indexed transactionId, string reason);
+event PayoutRequestCancelled(address indexed requester, string indexed transactionId);
 event ApprovalToRequestPayout(address indexed walletToDebit, address indexed requester);
 event RevokeApprovalToRequestPayout(address indexed walletToDebit, address indexed requester);
 ```
@@ -398,7 +433,14 @@ These implementation details are not part of the standard, although they can be 
 
 ## To Do's:
 
-* TO DO: propose a new name for ```transactionId```, so it is not confused with Ethereum transactions
 * TO DO: consider adding roles to the standard
 * TO DO: Check out ERC777 and extend this to comply with it, if appropriate
-* TO DO: add interest payments and out-of-limit penalties
+
+* TO DO: Explain the reason for having currency() in EMoneyToken
+* TO DO: Use ```operationId``` instead of ```transactionId``` in all mnethods (and explain why)
+* TO DO: Use "order" instead of "request" all over the place
+* TO DO: Change "cleared" to "clearable" in cleared transfers
+* TO DO: Add suspense account state in Payouts
+* TO DO: Add state diagrams in all workflow type transactions (Holds, Clearable transfers, Funding, Payouts)
+* TO DO: Change compliance functions to use "can..." instead of "check...", and only return a bytes32
+* TO DO: Return standard error codes instead of canDo and reason - as per ERC1066 and ERC1444

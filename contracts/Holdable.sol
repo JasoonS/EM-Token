@@ -3,10 +3,6 @@ pragma solidity ^0.5;
 import "./Compliant.sol";
 import "./interface/IHoldable.sol";
 
-contract Holdable is IHoldable, Compliant {
-
-    // Data structures (in eternal storage)
-
     /**
      * @title Holdable - generic holding mechanism for tokenized assets
      *
@@ -23,9 +19,11 @@ contract Holdable is IHoldable, Compliant {
      *
      * Holds can be specified to be "eternal", i.e. with no expiration. In this case, the hold cannot be released upon
      * expiration, and thus can only be released (or executed) either by the notary or by an operator
-     *
-     * (ToDo: consider allowing the payee to also be able to release the hold, as a way to reject it)
      */
+contract Holdable is IHoldable, Compliant {
+
+    // Data structures (in eternal storage)
+
     bytes32 constant private HOLDABLE_CONTRACT_NAME = "Holdable";
 
     /**
@@ -78,8 +76,6 @@ contract Holdable is IHoldable, Compliant {
      * @param expires A flag specifying whether the hold can expire or not
      * @param timeToExpiration (only relevant when expires==true) The time to be added to the currrent block.timestamp to
      * establish the expiration time for the hold. After the expiration time anyone can actually trigger the release of the hold
-     * @return The index in the array where the hold is actually created and stored (this is an unique identifier
-     * throughout the whole contract)
      */
     function hold(
         string  calldata transactionId,
@@ -90,12 +86,13 @@ contract Holdable is IHoldable, Compliant {
         uint256 timeToExpiration
     )
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         address from = msg.sender;
         _check(_checkHold, from, to, notary, amount);
-        return _hold(requester, transactionId, from, to, notary, amount, expires, timeToExpiration);
+        _hold(requester, transactionId, from, to, notary, amount, expires, timeToExpiration);
+        return true;
     }
 
     /**
@@ -112,8 +109,6 @@ contract Holdable is IHoldable, Compliant {
      * @param expires A flag specifying whether the hold can expire or not
      * @param timeToExpiration (only relevant when expires==true) The time to be added to the currrent block.timestamp to
      * establish the expiration time for the hold. After the expiration time anyone can actually trigger the release of the hold
-     * @return The index in the array where the hold is actually created and stored (this is an unique identifier
-     * throughout the whole contract)
      */
     function holdFrom(
         string  calldata transactionId,
@@ -125,11 +120,12 @@ contract Holdable is IHoldable, Compliant {
         uint256 timeToExpiration
     )
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         _check(_checkHold, from, to, notary, amount);
-        return  _hold(requester, transactionId, from, to, notary, amount, expires, timeToExpiration);
+        _hold(requester, transactionId, from, to, notary, amount, expires, timeToExpiration);
+        return true;
     }
 
     /**
@@ -149,7 +145,7 @@ contract Holdable is IHoldable, Compliant {
         bool expires = _holdExpires(issuer, transactionId);
         uint256 expiration = _holdExpiration(issuer, transactionId);
         HoldStatusCode finalStatus;
-        if(hasRole(msg.sender, OPERATOR_ROLE)) {
+        if(_hasRole(msg.sender, OPERATOR_ROLE)) {
             finalStatus = HoldStatusCode.ReleasedByOperator;
         } else if(notary == msg.sender) {
             finalStatus = HoldStatusCode.ReleasedByNotary;
@@ -185,7 +181,7 @@ contract Holdable is IHoldable, Compliant {
         uint256 expiration = _holdExpiration(issuer, transactionId);
         HoldStatusCode finalStatus;
         require(!expires || block.timestamp < expiration, "Hold is expired and cannot be released");
-        if(hasRole(msg.sender, OPERATOR_ROLE)) {
+        if(_hasRole(msg.sender, OPERATOR_ROLE)) {
             finalStatus = HoldStatusCode.ExecutedByOperator;
         } else if(notary == msg.sender) {
             finalStatus = HoldStatusCode.ExecutedByNotary;
@@ -224,7 +220,6 @@ contract Holdable is IHoldable, Compliant {
      * @notice Function to retrieve all the information available for a particular hold
      * @param issuer The address of the original sender of the hold
      * @param transactionId The ID of the hold in question
-     * @return index: the index of the hold (an unique identifier)
      * @return from: The address of the payer, from which the tokens are to be taken (if the hold is executed)
      * @return to: The address of the payee, to which the tokens are to be paid (if the hold is executed)
      * @return notary: the address that will be executing or releasing the hold
@@ -239,7 +234,6 @@ contract Holdable is IHoldable, Compliant {
     function retrieveHoldData(address issuer, string calldata transactionId)
         external view
         returns (
-            uint256 index,
             address from,
             address to,
             address notary,
@@ -249,7 +243,6 @@ contract Holdable is IHoldable, Compliant {
             HoldStatusCode status
         )
     {
-        index = _holdIndex(issuer, transactionId);
         from = _holdFrom(issuer, transactionId);
         to = _holdTo(issuer, transactionId);
         notary = _holdNotary(issuer, transactionId);
@@ -261,11 +254,11 @@ contract Holdable is IHoldable, Compliant {
 
     /**
      * @dev Function to know how much is locked on hold from a particular wallet
-     * @param account The address of the account
-     * @return The balance on hold for a particular account
+     * @param wallet The address of the wallet
+     * @return The balance on hold for a particular wallet
      */
-    function balanceOnHold(address account) external view returns (uint256) {
-        return _balanceOnHold(account);
+    function balanceOnHold(address wallet) external view returns (uint256) {
+        return _balanceOnHold(wallet);
     }
 
     /**
@@ -282,31 +275,58 @@ contract Holdable is IHoldable, Compliant {
      * @dev Function to know how many holds are there (open and closed)
      * @return The total holds count
      */
-    function holdsCount() external view returns (uint256) {
+    function manyHolds() external view returns (uint256) {
         return _manyHolds();
     }
 
     /**
-     * @notice Function to retrieve the ID information of a hold from the index
-     * @dev This is mainly used to be able to iterate the list of existing holds
-     * @param index the index of the hold (an unique identifier)
+     * @notice Function to retrieve all the information available for a particular hold
+     * @param  index The position in the holds array
      * @return issuer: The address of the original sender of the hold
      * @return transactionId: The ID of the hold in question
+     * @return from: The address of the payer, from which the tokens are to be taken (if the hold is executed)
+     * @return to: The address of the payee, to which the tokens are to be paid (if the hold is executed)
+     * @return notary: the address that will be executing or releasing the hold
+     * @return amount: the amount that will be transferred
+     * @return expires: a flag indicating whether the hold expires or not
+     * @return expiration: (only relevant in case expires==true) the absolute time (block.timestamp) by which the hold will
+     * expire (after that time the hold can be released by anyone)
+     * @return status: the current status of the hold
      * @dev issuer and transactionId are needed to index a hold. This is provided so different issuers can use the same transactionId,
      * as holding is a competitive resource
      */
-    function holdID(uint256 index) external view returns (address issuer, string memory transactionId) {
-        return _getHoldId(index);
+    function retrieveHoldData(uint256 index)
+        external view
+        returns (
+            address issuer,
+            string memory transactionId,
+            address from,
+            address to,
+            address notary,
+            uint256 amount,
+            bool expires,
+            uint256 expiration,
+            HoldStatusCode status
+        )
+    {
+        (issuer, transactionId) = _getHoldId(index);
+        from = _holdFrom(issuer, transactionId);
+        to = _holdTo(issuer, transactionId);
+        notary = _holdNotary(issuer, transactionId);
+        amount = _holdAmount(issuer, transactionId);
+        expires = _holdExpires(issuer, transactionId);
+        expiration = _holdExpiration(issuer, transactionId);
+        status = HoldStatusCode(_holdStatus(issuer, transactionId));
     }
 
     // Private functions
 
     function _getHoldingApproval(address wallet, address holder) private view returns (bool) {
-        return getBoolFromDoubleMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder);
+        return _eternalStorage.getBoolFromDoubleMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder);
     }
 
     function _setHoldingApproval(address wallet, address holder, bool value) private returns (bool) {
-        return setBoolInDoubleMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder, value);
+        return _eternalStorage.setBoolInDoubleMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder, value);
     }
 
     function _hold(
@@ -325,8 +345,8 @@ contract Holdable is IHoldable, Compliant {
         require(from == msg.sender || _getHoldingApproval(from, msg.sender), "Requester is not approved to hold");
         require(amount >= _availableFunds(from), "Not enough funds to hold");
         uint256 expiration = block.timestamp.add(timeToExpiration);
-        emit HoldCreated(requester, transactionId, from, to, notary, amount, expires, expiration, index);
-        return _createHold(requester, transactionId, from, to, notary, amount, expires, expiration, uint256(HoldStatusCode.Created));
+        emit HoldCreated(requester, transactionId, from, to, notary, amount, expires, expiration);
+        index = _createHold(requester, transactionId, from, to, notary, amount, expires, expiration, uint256(HoldStatusCode.Created));
     }
 
 }

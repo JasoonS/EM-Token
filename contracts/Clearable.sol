@@ -105,16 +105,16 @@ contract Clearable is IClearable, Compliant {
      * the cleared transfer request (together with the address of the sender)
      * @param to The wallet to which the transfer is directed to
      * @param amount The amount to be transferred
-     * @return The index of the entry of the new cleared transfer request in the internal array where it is stored
      */
     function orderClearedTransfer(string calldata transactionId, address to, uint256 amount)
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         address from = msg.sender;
         _check(_checkOrderClearedTransfer, from, to, amount);
-        index = _createClearedTransferRequest(requester, transactionId, from, to, amount);
+        _createClearedTransferRequest(requester, transactionId, from, to, amount);
+        return true;
     }
 
     /**
@@ -125,7 +125,6 @@ contract Clearable is IClearable, Compliant {
      * @param from The wallet the funds will be transferred from
      * @param to The wallet to which the transfer is directed to
      * @param amount The amount to be transferred
-     * @return The index of the entry of the new cleared transfer request in the internal array where it is stored
      */
     function orderClearedTransferFrom(
         string calldata transactionId,
@@ -134,11 +133,12 @@ contract Clearable is IClearable, Compliant {
         uint256 amount
     )
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         _check(_checkOrderClearedTransfer, from, to, amount);
-        index = _createClearedTransferRequest(requester, transactionId, from, to, amount);
+        _createClearedTransferRequest(requester, transactionId, from, to, amount);
+        return true;
     }
 
     /**
@@ -174,9 +174,9 @@ contract Clearable is IClearable, Compliant {
      */
     function processClearedTransferRequest(address requester, string calldata transactionId) external
         clearedTransferRequestJustCreated(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getClearedTransferIndex(requester, transactionId);
         _setClearedTransferStatus(index, ClearedTransferRequestStatusCode.InProcess);
         emit ClearedTransferRequestInProcess(requester, transactionId);
@@ -194,9 +194,9 @@ contract Clearable is IClearable, Compliant {
      */
     function executeClearedTransferRequest(address requester, string calldata transactionId) external
         clearedTransferRequestNotClosed(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getClearedTransferIndex(requester, transactionId);
         address from = _getFrom(index);
         address to = _getTo(index);
@@ -220,9 +220,9 @@ contract Clearable is IClearable, Compliant {
      */
     function rejectClearedTransferRequest(address requester, string calldata transactionId, string calldata reason) external
         clearedTransferRequestNotClosed(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getClearedTransferIndex(requester, transactionId);
         _finalizeHold(requester, transactionId, 0);
         _setClearedTransferStatus(index, ClearedTransferRequestStatusCode.Rejected);
@@ -246,23 +246,24 @@ contract Clearable is IClearable, Compliant {
      * @notice Function to retrieve all the information available for a particular cleared transfer request
      * @param requester The requester of the cleared transfer request
      * @param transactionId The ID of the cleared transfer request
-     * @return index: the index of the array where the request is stored
      * @return from: The address of the wallet from which the funds will be transferred
      * @return to: The address of the wallet that will receive the funds
      * @return amount: the amount of funds requested
      * @return status: the current status of the cleared transfer request
      */
-    function retrieveClearedTransferData(address requester, string calldata transactionId)
+    function retrieveClearedTransferData(
+        address requester,
+        string calldata transactionId
+    )
         external view
         returns (
-            uint256 index,
             address from,
             address to,
             uint256 amount,
             ClearedTransferRequestStatusCode status
         )
     {
-        index = _getClearedTransferIndex(requester, transactionId);
+        uint256 index = _getClearedTransferIndex(requester, transactionId);
         from = _getFrom(index);
         to = _getTo(index);
         amount = _getClearedTransferAmount(index);
@@ -313,24 +314,24 @@ contract Clearable is IClearable, Compliant {
 
     function _approveToRequestClearedTransfer(address wallet, address requester) private returns (bool) {
         emit ApprovalToRequestClearedTransfer(wallet, requester);
-        return setBoolInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, true);
+        return _eternalStorage.setBoolInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, true);
     }
 
     function _revokeApprovalToRequestClearedTransfer(address wallet, address requester) private returns (bool) {
         emit RevokeApprovalToRequestClearedTransfer(wallet, requester);
-        return setBoolInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, false);
+        return _eternalStorage.setBoolInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, false);
     }
 
     function _isApprovedToRequestClearedTransfer(address wallet, address requester) public view returns (bool){
-        return getBoolFromDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester);
+        return _eternalStorage.getBoolFromDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester);
     }
 
     function _manyClearedTransferRequests() private view returns (uint256 many) {
-        return getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS, 0);
+        return _eternalStorage.getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS, 0);
     }
 
     function _getClearedTransferRequester(uint256 index) private view clearedTransferRequestIndexExists(index) returns (address requester) {
-        requester = getAddressFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_REQUESTERS, index);
+        requester = _eternalStorage.getAddressFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_REQUESTERS, index);
     }
 
     function _getClearedTransferIndex(
@@ -341,31 +342,31 @@ contract Clearable is IClearable, Compliant {
         clearedTransferRequestExists(requester, transactionId)
         returns (uint256 index)
     {
-        index = getUintFromDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId);
+        index = _eternalStorage.getUintFromDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId);
     }
 
     function _gettransactionId(uint256 index) private view clearedTransferRequestIndexExists(index) returns (string memory transactionId) {
-        transactionId = getStringFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, index);
+        transactionId = _eternalStorage.getStringFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, index);
     }
 
     function _getFrom(uint256 index) private view clearedTransferRequestIndexExists(index) returns (address from) {
-        from = getAddressFromArray(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, index);
+        from = _eternalStorage.getAddressFromArray(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, index);
     }
 
     function _getTo(uint256 index) private view clearedTransferRequestIndexExists(index) returns (address to) {
-        to = getAddressFromArray(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, index);
+        to = _eternalStorage.getAddressFromArray(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, index);
     }
 
     function _getClearedTransferAmount(uint256 index) private view clearedTransferRequestIndexExists(index) returns (uint256 amount) {
-        amount = getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_AMOUNTS, index);
+        amount = _eternalStorage.getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_AMOUNTS, index);
     }
 
     function _getClearedTransferStatus(uint256 index) private view clearedTransferRequestIndexExists(index) returns (ClearedTransferRequestStatusCode status) {
-        status = ClearedTransferRequestStatusCode(getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_STATUS_CODES, index));
+        status = ClearedTransferRequestStatusCode(_eternalStorage.getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_STATUS_CODES, index));
     }
 
     function _setClearedTransferStatus(uint256 index, ClearedTransferRequestStatusCode status) private clearedTransferRequestIndexExists(index) returns (bool) {
-        return setUintInArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_STATUS_CODES, index, uint256(status));
+        return _eternalStorage.setUintInArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_STATUS_CODES, index, uint256(status));
     }
 
     function _createClearedTransferRequest(
@@ -382,15 +383,15 @@ contract Clearable is IClearable, Compliant {
         require(requester == from || _isApprovedToRequestClearedTransfer(from, requester), "Not approved to order cleared transfers");
         require(amount >= _availableFunds(from), "Not enough funds to request cleared transfer");
         _createHold(requester, transactionId, from, to, address(0), amount, false, 0, 0); // No notary or status, as this is going to be managed by the methods
-        pushAddressToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_REQUESTERS, requester);
-        pushStringToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS, transactionId);
-        pushAddressToArray(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, from);
-        pushAddressToArray(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, to);
-        pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_AMOUNTS, amount);
-        pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_STATUS_CODES, uint256(ClearedTransferRequestStatusCode.Requested));
+        _eternalStorage.pushAddressToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_REQUESTERS, requester);
+        _eternalStorage.pushStringToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS, transactionId);
+        _eternalStorage.pushAddressToArray(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, from);
+        _eternalStorage.pushAddressToArray(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, to);
+        _eternalStorage.pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_AMOUNTS, amount);
+        _eternalStorage.pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_STATUS_CODES, uint256(ClearedTransferRequestStatusCode.Requested));
         index = _manyClearedTransferRequests();
-        setUintInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId, index);
-        emit ClearedTransferRequested(requester, transactionId, from, to, amount, index);
+        _eternalStorage.setUintInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId, index);
+        emit ClearedTransferRequested(requester, transactionId, from, to, amount);
         return index;
     }
 

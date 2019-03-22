@@ -7,12 +7,12 @@ interface ICompliant {
     function checkTransfer(address from, address to, uint256 value) external view
         returns (bool canDo, string memory reason);
 
-    function checkApprove(address allower, address spender, uint256 value) external view
+    function checkApprove(address owner, address spender, uint256 value) external view
         returns (bool canDo, string memory reason);
 
     // Hold
     
-    function checkHold(address payer, address payee, address notary, uint256 value) external view
+    function checkHold(address from, address to, address notary, uint256 value) external view
         returns (bool canDo, string memory reason);
 
     function checkApproveToHold(address payer, address holder) external view
@@ -23,7 +23,7 @@ interface ICompliant {
     function checkApproveToOrderClearedTransfer(address fromWallet, address requester) external view
         returns (bool canDo, string memory reason);
 
-    function checkOrderClearedTransfer(address fromWallet, address toWallet, uint256 value) external view
+    function checkOrderClearedTransfer(address from, address to, uint256 value) external view
         returns (bool canDo, string memory reason);
 
     // Fundable

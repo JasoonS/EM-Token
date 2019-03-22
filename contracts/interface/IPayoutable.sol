@@ -9,17 +9,16 @@ interface IPayoutable {
         string indexed transactionId,
         address indexed walletToDebit,
         uint256 amount,
-        string instructions,
-        uint256 index
+        string instructions
     );
 
-    event PayoutRequestInProcess(address requester, string indexed transactionId);
+    event PayoutRequestInProcess(address indexed requester, string indexed transactionId);
 
-    event PayoutRequestExecuted(address requester, string indexed transactionId);
+    event PayoutRequestExecuted(address indexed requester, string indexed transactionId);
 
-    event PayoutRequestRejected(address requester, string indexed transactionId, string reason);
+    event PayoutRequestRejected(address indexed requester, string indexed transactionId, string reason);
 
-    event PayoutRequestCancelled(address requester, string indexed transactionId);
+    event PayoutRequestCancelled(address indexed requester, string indexed transactionId);
 
     event ApprovalToRequestPayout(address indexed walletToDebit, address indexed requester);
 
@@ -46,11 +45,14 @@ interface IPayoutable {
      * account to which the funds should be directed (normally a hash / reference to the actual information
      * in an external repository), or a code to indicate that the tokenization entity should use the default
      * bank account associated with the wallet
-     * @return The index of the entry of the new payout request in the internal array where it is stored
      */
-    function requestPayout(string calldata transactionId, uint256 amount, string calldata instructions)
+    function requestPayout(
+        string calldata transactionId,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Method to request payout on behalf of a (different) wallet owner (analogous to "transferFrom" in
@@ -58,11 +60,15 @@ interface IPayoutable {
      * @param walletToDebit The address of the wallet from which the funds will be taken
      * @param amount The amount requested
      * @param instructions The debit instructions, as is "requestPayout"
-     * @return The index of the entry of the new payout request in the internal array where it is stored
      */
-    function requestPayoutFrom(string calldata transactionId, address walletToDebit, uint256 amount, string calldata instructions)
+    function requestPayoutFrom(
+        string calldata transactionId,
+        address walletToDebit,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Function to cancel an outstanding (i.e. not processed) payout request
@@ -125,14 +131,21 @@ interface IPayoutable {
      * @notice Function to retrieve all the information available for a particular payout request
      * @param requester The requester of the payout request
      * @param transactionId The ID of the payout request
-     * @return index: the index of the array where the request is stored
      * @return walletToDebit: The address of the wallet from which the funds will be taken
      * @return amount: the amount of funds requested
      * @return instructions: the routing instructions to determine the destination of the funds being requested
      * @return status: the current status of the payout request
      */
-    function retrievePayoutData(address requester, string calldata transactionId)
+    function retrievePayoutData(
+        address requester,
+        string calldata transactionId
+    )
         external view
-        returns (uint256 index, address walletToDebit, uint256 amount, string memory instructions, PayoutRequestStatusCode status);
+        returns (
+            address walletToDebit,
+            uint256 amount,
+            string memory instructions,
+            PayoutRequestStatusCode status
+        );
 
 }

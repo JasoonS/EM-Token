@@ -29,37 +29,24 @@ contract Whitelistable is RoleControl {
     event Whitelisted(address who);
     event UnWhitelisted(address who);
 
-// Constructor
-
-    constructor() internal {
-        _pushAddressToWhitelist(SUSPENSE_WALLET);
-    }
-
-// Modifiers
-
-    modifier onlyWhitelisted(address who) {
-        require(_isWhitelisted(who), "Address not whitelisted");
-        _;
-    }
-
 // External state-modifying functions
 
     /**
      * @dev Whitelist an individual address
      * @param who The address to be whitelisted
      */
-    function whitelist(address who) external onlyRole(OPERATOR_ROLE) returns (uint256) {
-        emit Whitelisted(who);
-        return _pushAddressToWhitelist(who);
+    function whitelist(address who) external returns (uint256) {
+        requireRole(OPERATOR_ROLE);
+        return _whitelist(who);
     }
 
     /**
      * @dev Unwhitelist an individual address
      * @param who The address to be unwhitelisted
      */
-    function unWhitelist(address who) external onlyRole(OPERATOR_ROLE) returns (bool) {
-        emit UnWhitelisted(who);
-        return _deleteAddressFromWhitelist(who);
+    function unWhitelist(address who) external returns (bool) {
+        requireRole(OPERATOR_ROLE);
+        return _unWhitelist(who);
     }
 
 // External view functions
@@ -99,37 +86,51 @@ contract Whitelistable is RoleControl {
 
     // Internal functions
 
+    function _whitelist(address who) internal returns (uint256) {
+        emit Whitelisted(who);
+        return _pushAddressToWhitelist(who);
+    }
+
+    function _unWhitelist(address who) internal returns (bool) {
+        emit UnWhitelisted(who);
+        return _deleteAddressFromWhitelist(who);
+    }
+
     function _isWhitelisted(address who) internal view returns (bool) {
         return _getWhitelistedIndex(who) > 0;
+    }
+
+    function requireWhitelisted(address who) internal view {
+        require(_isWhitelisted(who), "Address not whitelisted");
     }
 
     // Private functions
 
     function _pushAddressToWhitelist(address who) private returns (uint256 index) {
         require(!_isWhitelisted(who), "Address is already whitelisted");
-        pushAddressToArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, who);
+        _eternalStorage.pushAddressToArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, who);
         index = _getNumberOfWhitelistedWallets();
-        setUintInMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who, index);
+        _eternalStorage.setUintInMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who, index);
     }
 
     function _deleteAddressFromWhitelist(address who) private returns (bool) {
         uint256 index = _getWhitelistedIndex(who);
         require(index > 0, "Address is not whitelisted");
         return
-            deleteAddressFromArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, index) &&
-            deleteAddressFromMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
+            _eternalStorage.deleteAddressFromArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, index) &&
+            _eternalStorage.deleteAddressFromMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
     }
 
     function _getWhitelistedAddress(uint256 index) private view returns (address) {
-        return getAddressFromArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, index);
+        return _eternalStorage.getAddressFromArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, index);
     }
 
     function _getWhitelistedIndex(address who) private view returns (uint256 index) {
-        index = getUintFromMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
+        index = _eternalStorage.getUintFromMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
     }
 
     function _getNumberOfWhitelistedWallets() private view returns (uint256) {
-        return getNumberOfElementsInArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY);
+        return _eternalStorage.getNumberOfElementsInArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY);
     }
 
 }

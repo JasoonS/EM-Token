@@ -96,38 +96,51 @@ contract Payoutable is IPayoutable, Compliant {
 
     /**
      * @notice Method for a wallet owner to request payout from the tokenizer on his/her own behalf
+     * @param transactionId The ID of the payout request, which can then be used to index all the information about
+     * the payout request (together with the address of the sender)
      * @param amount The amount requested
      * @param instructions The instructions for the payout request - e.g. routing information about the bank
      * account to which the funds should be directed (normally a hash / reference to the actual information
      * in an external repository), or a code to indicate that the tokenization entity should use the default
      * bank account associated with the wallet
-     * @return The index of the entry of the new payout request in the internal array where it is stored
      */
-    function requestPayout(string calldata transactionId, uint256 amount, string calldata instructions)
+    function requestPayout(
+        string calldata transactionId,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         address walletToDebit = msg.sender;
         _check(_checkRequestPayout, walletToDebit, requester, amount);
-        index = _createPayoutRequest(requester, transactionId, walletToDebit, amount, instructions);
+        _createPayoutRequest(requester, transactionId, walletToDebit, amount, instructions);
+        return true;
     }
 
     /**
      * @notice Method to request payout on behalf of a (different) wallet owner (analogous to "transferFrom" in
      * classical ERC20). The requester needs to be previously approved
+     * @param transactionId The ID of the payout request, which can then be used to index all the information about
+     * the payout request (together with the address of the sender)
      * @param walletToDebit The address of the wallet from which the funds will be taken
      * @param amount The amount requested
      * @param instructions The debit instructions, as is "requestPayout"
-     * @return The index of the entry of the new payout request in the internal array where it is stored
      */
-    function requestPayoutFrom(string calldata transactionId, address walletToDebit, uint256 amount, string calldata instructions)
+    function requestPayoutFrom(
+        string calldata transactionId,
+        address walletToDebit,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         _check(_checkRequestPayout, walletToDebit, requester, amount);
-        index = _createPayoutRequest(requester, transactionId, walletToDebit, amount, instructions);
+        _createPayoutRequest(requester, transactionId, walletToDebit, amount, instructions);
+        return true;
     }
 
     /**
@@ -165,9 +178,9 @@ contract Payoutable is IPayoutable, Compliant {
      */
     function processPayoutRequest(address requester, string calldata transactionId) external
         payoutRequestJustCreated(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getPayoutIndex(requester, transactionId);
         address walletToDebit = _getWalletToDebit(index);
         uint256 amount = _getPayoutAmount(index);
@@ -192,9 +205,9 @@ contract Payoutable is IPayoutable, Compliant {
      */
     function executePayoutRequest(address requester, string calldata transactionId) external
         payoutRequestInProcess(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getPayoutIndex(requester, transactionId);
         uint256 amount = _getPayoutAmount(index);
         _decreaseBalance(SUSPENSE_WALLET, amount);
@@ -213,9 +226,9 @@ contract Payoutable is IPayoutable, Compliant {
      * 
      */
     function rejectPayoutRequest(address requester, string calldata transactionId, string calldata reason) external
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getPayoutIndex(requester, transactionId);
         address walletToDebit = _getWalletToDebit(index);
         uint256 amount = _getPayoutAmount(index);
@@ -254,11 +267,19 @@ contract Payoutable is IPayoutable, Compliant {
      * @return instructions: the routing instructions to determine the destination of the funds being requested
      * @return status: the current status of the payout request
      */
-    function retrievePayoutData(address requester, string calldata transactionId)
+    function retrievePayoutData(
+        address requester,
+        string calldata transactionId
+    )
         external view
-        returns (uint256 index, address walletToDebit, uint256 amount, string memory instructions, PayoutRequestStatusCode status)
+        returns (
+            address walletToDebit,
+            uint256 amount,
+            string memory instructions,
+            PayoutRequestStatusCode status
+        )
     {
-        index = _getPayoutIndex(requester, transactionId);
+        uint256 index = _getPayoutIndex(requester, transactionId);
         walletToDebit = _getWalletToDebit(index);
         amount = _getPayoutAmount(index);
         instructions = _getPayoutInstructions(index);
@@ -282,7 +303,7 @@ contract Payoutable is IPayoutable, Compliant {
         returns (address requester, string memory transactionId, address walletToDebit, uint256 amount, string memory instructions, PayoutRequestStatusCode status)
     {
         requester = _getPayoutRequester(index);
-        transactionId = _gettransactionId(index);
+        transactionId = _getPayoutTransactionId(index);
         walletToDebit = _getWalletToDebit(index);
         amount = _getPayoutAmount(index);
         instructions = _getPayoutInstructions(index);
@@ -301,11 +322,11 @@ contract Payoutable is IPayoutable, Compliant {
     // Private functions
 
     function _manyPayoutRequests() private view returns (uint256 many) {
-        return getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS, 0);
+        return _eternalStorage.getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS, 0);
     }
 
     function _getPayoutRequester(uint256 index) private view payoutRequestIndexExists(index) returns (address requester) {
-        requester = getAddressFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_REQUESTERS, index);
+        requester = _eternalStorage.getAddressFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_REQUESTERS, index);
     }
 
     function _getPayoutIndex(
@@ -316,45 +337,45 @@ contract Payoutable is IPayoutable, Compliant {
         payoutRequestExists(requester, transactionId)
         returns (uint256 index)
     {
-        index = getUintFromDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId);
+        index = _eternalStorage.getUintFromDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId);
     }
 
-    function _gettransactionId(uint256 index) private view payoutRequestIndexExists(index) returns (string memory transactionId) {
-        transactionId = getStringFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, index);
+    function _getPayoutTransactionId(uint256 index) private view payoutRequestIndexExists(index) returns (string memory transactionId) {
+        transactionId = _eternalStorage.getStringFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, index);
     }
 
     function _getWalletToDebit(uint256 index) private view payoutRequestIndexExists(index) returns (address walletToDebit) {
-        walletToDebit = getAddressFromArray(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, index);
+        walletToDebit = _eternalStorage.getAddressFromArray(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, index);
     }
 
     function _getPayoutAmount(uint256 index) private view payoutRequestIndexExists(index) returns (uint256 amount) {
-        amount = getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, index);
+        amount = _eternalStorage.getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, index);
     }
 
     function _getPayoutInstructions(uint256 index) private view payoutRequestIndexExists(index) returns (string memory instructions) {
-        instructions = getStringFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, index);
+        instructions = _eternalStorage.getStringFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, index);
     }
 
     function _getPayoutStatus(uint256 index) private view payoutRequestIndexExists(index) returns (PayoutRequestStatusCode status) {
-        status = PayoutRequestStatusCode(getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, index));
+        status = PayoutRequestStatusCode(_eternalStorage.getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, index));
     }
 
     function _setPayoutStatus(uint256 index, PayoutRequestStatusCode status) private payoutRequestIndexExists(index) returns (bool) {
-        return setUintInArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, index, uint256(status));
+        return _eternalStorage.setUintInArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, index, uint256(status));
     }
 
     function _approveToRequestPayout(address walletToDebit, address requester) private returns (bool) {
         emit ApprovalToRequestPayout(walletToDebit, requester);
-        return setBoolInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, true);
+        return _eternalStorage.setBoolInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, true);
     }
 
     function _revokeApprovalToRequestPayout(address walletToDebit, address requester) private returns (bool) {
         emit RevokeApprovalToRequestPayout(walletToDebit, requester);
-        return setBoolInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, false);
+        return _eternalStorage.setBoolInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, false);
     }
 
     function _isApprovedToRequestPayout(address walletToDebit, address requester) public view returns (bool){
-        return getBoolFromDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester);
+        return _eternalStorage.getBoolFromDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester);
     }
 
     function _createPayoutRequest(address requester, string memory transactionId, address walletToDebit, uint256 amount, string memory instructions)
@@ -365,15 +386,15 @@ contract Payoutable is IPayoutable, Compliant {
         require(requester == walletToDebit || _isApprovedToRequestPayout(walletToDebit, requester), "Not approved to request payout");
         require(amount >= _availableFunds(walletToDebit), "Not enough funds to ask for payout");
         _createHold(requester, transactionId, walletToDebit, SUSPENSE_WALLET, address(0), amount, false, 0, 0); // No notary or status, as this is going to be managed by the methods
-        pushAddressToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_REQUESTERS, requester);
-        pushStringToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS, transactionId);
-        pushAddressToArray(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, walletToDebit);
-        pushUintToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, amount);
-        pushStringToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, instructions);
-        pushUintToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, uint256(PayoutRequestStatusCode.Requested));
+       _eternalStorage. pushAddressToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_REQUESTERS, requester);
+        _eternalStorage.pushStringToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS, transactionId);
+        _eternalStorage.pushAddressToArray(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, walletToDebit);
+        _eternalStorage.pushUintToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, amount);
+        _eternalStorage.pushStringToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, instructions);
+        _eternalStorage.pushUintToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, uint256(PayoutRequestStatusCode.Requested));
         index = _manyPayoutRequests();
-        setUintInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId, index);
-        emit PayoutRequested(requester, transactionId, walletToDebit, amount, instructions, index);
+        _eternalStorage.setUintInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId, index);
+        emit PayoutRequested(requester, transactionId, walletToDebit, amount, instructions);
         return index;
     }
 

@@ -9,17 +9,16 @@ interface IFundable {
         string indexed transactionId,
         address indexed walletToFund,
         uint256 amount,
-        string instructions,
-        uint256 index
+        string instructions
     );
 
-    event FundingRequestInProcess(address requester, string indexed transactionId);
+    event FundingRequestInProcess(address indexed requester, string indexed transactionId);
 
-    event FundingRequestExecuted(address requester, string indexed transactionId);
+    event FundingRequestExecuted(address indexed requester, string indexed transactionId);
 
-    event FundingRequestRejected(address requester, string indexed transactionId, string reason);
+    event FundingRequestRejected(address indexed requester, string indexed transactionId, string reason);
 
-    event FundingRequestCancelled(address requester, string indexed transactionId);
+    event FundingRequestCancelled(address indexed requester, string indexed transactionId);
 
     event ApprovalToRequestFunding(address indexed walletToFund, address indexed requester);
 
@@ -46,11 +45,14 @@ interface IFundable {
      * account to be debited (normally a hash / reference to the actual information in an external repository),
      * or a code to indicate that the tokenization entity should use the default bank account associated with
      * the wallet
-     * @return The index of the entry of the new funding request in the internal array where it is stored
      */
-    function requestFunding(string calldata transactionId, uint256 amount, string calldata instructions)
+    function requestFunding(
+        string calldata transactionId,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Method to request funding on behalf of a (different) wallet owner (analogous to "transferFrom" in
@@ -58,11 +60,15 @@ interface IFundable {
      * @param walletToFund The address of the wallet which will receive the funding
      * @param amount The amount requested
      * @param instructions The debit instructions, as is "requestFunding"
-     * @return The index of the entry of the new funding request in the internal array where it is stored
      */
-    function requestFundingFrom(string calldata transactionId, address walletToFund, uint256 amount, string calldata instructions)
+    function requestFundingFrom(
+        string calldata transactionId,
+        address walletToFund,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Function to cancel an outstanding (i.e. not processed) funding request
@@ -122,7 +128,6 @@ interface IFundable {
      * @notice Function to retrieve all the information available for a particular funding request
      * @param requester The requester of the funding request
      * @param transactionId The ID of the funding request
-     * @return index: the index of the array where the request is stored
      * @return walletToFund: the wallet to which the requested funds are directed to
      * @return amount: the amount of funds requested
      * @return instructions: the routing instructions to determine the source of the funds being requested
@@ -130,6 +135,11 @@ interface IFundable {
      */
     function retrieveFundingData(address requester, string calldata transactionId)
         external view
-        returns (uint256 index, address walletToFund, uint256 amount, string memory instructions, FundingRequestStatusCode status);
+        returns (
+            address walletToFund,
+            uint256 amount,
+            string memory instructions,
+            FundingRequestStatusCode status
+        );
         
 }

@@ -2,7 +2,7 @@ pragma solidity ^0.5;
 
 import "./libraries/Roles.sol";
 import "./libraries/Strings.sol";
-import "./EternalStorageWrapper.sol";
+import "./EternalStorageConnector.sol";
 
 /**
  * @title RoleControl
@@ -19,7 +19,7 @@ import "./EternalStorageWrapper.sol";
  * @dev RoleControl inherits Ownable through EternalStorageWrapper, which in turn inherits from EternalStorageWrapperBase,
  * which is Ownable. Therefore onlyOwner is still used for technical admin purposes throughout the contract
  */
-contract RoleControl is EternalStorageWrapper {
+contract RoleControl is EternalStorageConnector {
 
     using Roles for Roles.Role;
     using Strings for string;
@@ -60,17 +60,6 @@ contract RoleControl is EternalStorageWrapper {
 
     // Constructor
 
-    // Modifiers
-
-    /**
-     * @notice Implements a generic modifier to check whether msg.sender has a particular role
-     * @param role The role being checked
-     */
-    modifier onlyRole(bytes32 role) {
-        require(hasRole(msg.sender, role), string("Sender does not have role ").concat(role));
-        _;
-    }
-
     // Interface functions
 
     /**
@@ -78,8 +67,8 @@ contract RoleControl is EternalStorageWrapper {
      * @param account The address being r
      * @param role The role being checked
      */
-    function hasRole(address account, bytes32 role) public view returns (bool) {
-        return getBoolFromDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
+    function hasRole(address account, bytes32 role) external view returns (bool) {
+        return _hasRole(account, role);
     }
 
     /**
@@ -88,7 +77,7 @@ contract RoleControl is EternalStorageWrapper {
      * @param account The address to which the role is going to be given
      * @param role The role being given
      */
-    function addRole(address account, bytes32 role) public onlyOwner returns (bool) {
+    function addRole(address account, bytes32 role) external onlyOwner returns (bool) {
         require(account != address(0), "Cannot add role to address 0");
         return _addRole(account, role);
     }
@@ -99,7 +88,7 @@ contract RoleControl is EternalStorageWrapper {
      * @param account The address being revoked
      * @param role The role being revoked
      */
-    function revokeRole(address account, bytes32 role) public onlyOwner returns (bool) {
+    function revokeRole(address account, bytes32 role) external onlyOwner returns (bool) {
         require(account != address(0), "Cannot revoke role from address 0");
         return _removeRole(account, role);
     }
@@ -110,8 +99,8 @@ contract RoleControl is EternalStorageWrapper {
      * @param newAccount The address being revoked
      * @param role The role being transferred
      */
-    function transferRole(address newAccount, bytes32 role) public returns (bool) {
-        require(hasRole(msg.sender, role), string("Sender does not have role ").concat(role));
+    function transferRole(address newAccount, bytes32 role) external returns (bool) {
+        requireRole(role);
         require(newAccount != address(0), "Cannot transfer role to address 0");
         _removeRole(msg.sender, role);
         return _addRole(newAccount, role);
@@ -122,22 +111,30 @@ contract RoleControl is EternalStorageWrapper {
      * @dev Admin roles cannot be renounced
      * @param role The role being renounced
      */
-    function renounceRole(bytes32 role) public returns (bool) {
+    function renounceRole(bytes32 role) external returns (bool) {
         return _removeRole(msg.sender, role);
     }
 
     // Internal functions
 
+    function requireRole(bytes32 role) internal view {
+        require(_hasRole(msg.sender, role), string("Sender does not have role ").concat(role));
+    } 
+
     // Private functions
 
     function _addRole(address _account, bytes32 role) private returns (bool) {
         emit RoleAdded(_account, role);
-        return setBoolInDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, _account, true);
+        return _eternalStorage.setBoolInDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, _account, true);
     }
 
     function _removeRole(address account, bytes32 role) private returns (bool) {
         emit RoleRemoved(account, role);
-        return deleteBoolFromDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
+        return _eternalStorage.deleteBoolFromDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
+    }
+
+    function _hasRole(address account, bytes32 role) public view returns (bool) {
+        return _eternalStorage.getBoolFromDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
     }
 
 }

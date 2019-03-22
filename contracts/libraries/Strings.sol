@@ -22,4 +22,8 @@ library Strings {
         return keccak256(abi.encodePacked(_s1, _s2));
     }
 
+    function equals(string memory _s1, string memory _s2) internal pure returns (bool) {
+        return keccak256(abi.encode(_s1)) == keccak256(abi.encode(_s2));
+    }
+
 }

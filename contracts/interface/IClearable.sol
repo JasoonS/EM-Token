@@ -9,8 +9,7 @@ interface IClearable {
         string  indexed transactionId,
         address indexed from,
         address to,
-        uint256 amount,
-        uint256 index
+        uint256 amount
     );
 
     event ClearedTransferRequestInProcess(address requester, string indexed transactionId);
@@ -42,11 +41,14 @@ interface IClearable {
      * the cleared transfer request (together with the address of the sender)
      * @param to The wallet to which the transfer is directed to
      * @param amount The amount to be transferred
-     * @return The index of the entry of the new cleared transfer request in the internal array where it is stored
      */
-    function orderClearedTransfer(string calldata transactionId, address to, uint256 amount)
+    function orderClearedTransfer(
+        string calldata transactionId,
+        address to,
+        uint256 amount
+    )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Method to request cleared transfer on behalf of a (different) wallet owner (analogous to "transferFrom" in
@@ -56,7 +58,6 @@ interface IClearable {
      * @param from The wallet the funds will be transferred from
      * @param to The wallet to which the transfer is directed to
      * @param amount The amount to be transferred
-     * @return The index of the entry of the new cleared transfer request in the internal array where it is stored
      */
     function orderClearedTransferFrom(
         string calldata transactionId,
@@ -65,7 +66,7 @@ interface IClearable {
         uint256 amount
     )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Function to cancel an outstanding (i.e. not processed) cleared transfer request
@@ -126,7 +127,6 @@ interface IClearable {
      * @notice Function to retrieve all the information available for a particular cleared transfer request
      * @param requester The requester of the cleared transfer request
      * @param transactionId The ID of the cleared transfer request
-     * @return index: the index of the array where the request is stored
      * @return from: The address of the wallet from which the funds will be transferred
      * @return to: The address of the wallet that will receive the funds
      * @return amount: the amount of funds requested
@@ -135,7 +135,6 @@ interface IClearable {
     function retrieveClearedTransferData(address requester, string calldata transactionId)
         external view
         returns (
-            uint256 index,
             address from,
             address to,
             uint256 amount,

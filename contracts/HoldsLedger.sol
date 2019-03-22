@@ -1,9 +1,9 @@
 pragma solidity ^0.5;
 
-import "./EternalStorageWrapper.sol";
+import "./EternalStorageConnector.sol";
 import "./libraries/SafeMath.sol";
 
-contract HoldsLedger is EternalStorageWrapper {
+contract HoldsLedger is EternalStorageConnector {
 
     using SafeMath for uint256;
 
@@ -90,30 +90,7 @@ contract HoldsLedger is EternalStorageWrapper {
         bool r2 = _setHoldStatus(index, status);
         return r1 && r2;
     }
-
-    function _holdData(address issuer, string memory transactionId)
-        internal view
-        returns (
-            uint256 index,
-            address from,
-            address to,
-            address notary,
-            uint256 amount,
-            bool    expires,
-            uint256 expiration,
-            uint256 status
-        )
-    {
-        index = _getHoldIndex(issuer, transactionId);
-        from = _getHoldFrom(index);
-        to = _getHoldTo(index);
-        notary = _getHoldNotary(index);
-        amount = _getHoldAmount(index);
-        expires = _getHoldExpires(index);
-        expiration = _getHoldExpiration(index);
-        status = _getHoldStatus(index);
-    }
-
+    
     function _holdIndex(address issuer, string memory transactionId) internal view returns(uint index) {
         return _getHoldIndex(issuer, transactionId);
     }
@@ -150,8 +127,8 @@ contract HoldsLedger is EternalStorageWrapper {
         return _getManyHolds();
     }
 
-    function _balanceOnHold(address account) internal view returns (uint256) {
-        return _getBalanceOnHold(account);
+    function _balanceOnHold(address wallet) internal view returns (uint256) {
+        return _getBalanceOnHold(wallet);
     }
 
     function _totalSupplyOnHold() internal view returns (uint256) {
@@ -159,7 +136,7 @@ contract HoldsLedger is EternalStorageWrapper {
     }
 
     function _getHoldId(uint256 index) internal view returns (address issuer, string memory transactionId) {
-        return (_getHoldIssuer(index), _getTransactionId(index));
+        return (_getHoldIssuer(index), _getHoldTransactionId(index));
     }
 
     function _changeTimeToHold(address issuer, string memory transactionId, uint256 timeToExpirationFromNow) internal returns (bool) {
@@ -169,74 +146,74 @@ contract HoldsLedger is EternalStorageWrapper {
     // Private functions
 
     function _getManyHolds() private view returns (uint256 many) {
-        return getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, 0);
+        return _eternalStorage.getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, 0);
     }
 
     function _getHoldIndex(address issuer, string memory transactionId) private view holdExists(issuer, transactionId) returns (uint256) {
-        return getUintFromMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, transactionId);
+        return _eternalStorage.getUintFromMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, transactionId);
     }
 
-    function _getTransactionId(uint256 index) private view holdIndexExists(index) returns (string memory) {
-        return getStringFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, index);
+    function _getHoldTransactionId(uint256 index) private view holdIndexExists(index) returns (string memory) {
+        return _eternalStorage.getStringFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, index);
     }
 
     function _getHoldIssuer(uint256 index) private view holdIndexExists(index) returns (address) {
-        return getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_ISSUERS, index);
+        return _eternalStorage.getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_ISSUERS, index);
     }
 
     function _getHoldFrom(uint256 index) private view holdIndexExists(index) returns (address) {
-        return getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_FROMS, index);
+        return _eternalStorage.getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_FROMS, index);
     }
 
     function _getHoldTo(uint256 index) private view holdIndexExists(index) returns (address) {
-        return getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_TOS, index);
+        return _eternalStorage.getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_TOS, index);
     }
 
     function _getHoldNotary(uint256 index) private view holdIndexExists(index) returns (address) {
-        return getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_NOTARIES, index);
+        return _eternalStorage.getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_NOTARIES, index);
     }
 
     function _getHoldAmount(uint256 index) private view holdIndexExists(index) returns (uint256) {
-        return getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_AMOUNTS, index);
+        return _eternalStorage.getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_AMOUNTS, index);
     }
 
     function _getHoldExpires(uint256 index) private view holdIndexExists(index) returns (bool) {
-        return getBoolFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRES, index);
+        return _eternalStorage.getBoolFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRES, index);
     }
 
     function _getHoldExpiration(uint256 index) private view holdIndexExists(index) returns (uint256) {
-        return getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRATIONS, index);
+        return _eternalStorage.getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRATIONS, index);
     }
 
     function _setHoldExpiration(uint256 index, uint256 expiration) private holdIndexExists(index) returns (bool) {
-        return setUintInArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRATIONS, index, expiration);
+        return _eternalStorage.setUintInArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRATIONS, index, expiration);
     }
 
     function _getHoldStatus(uint256 index) private view holdIndexExists(index) returns (uint256) {
-        return getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_STATUS_CODES, index);
+        return _eternalStorage.getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_STATUS_CODES, index);
     }
 
     function _setHoldStatus(uint256 index, uint256 status) private holdIndexExists(index) returns (bool) {
-        return setUintInArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_STATUS_CODES, index, status);
+        return _eternalStorage.setUintInArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_STATUS_CODES, index, status);
     }
 
-    function _getBalanceOnHold(address account) private view returns (uint256) {
-        return getUintFromMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, account);
+    function _getBalanceOnHold(address wallet) private view returns (uint256) {
+        return _eternalStorage.getUintFromMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet);
     }
 
     function _getTotalSupplyOnHold() private view returns (uint256) {
-        return getUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD);
+        return _eternalStorage.getUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD);
     }
 
-    function _addBalanceOnHold(address account, uint256 amount) private returns (bool) {
-        bool r1 = setUintInMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, account, _getBalanceOnHold(account).add(amount));
-        bool r2 = setUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD, _getTotalSupplyOnHold().add(amount));
+    function _addBalanceOnHold(address wallet, uint256 amount) private returns (bool) {
+        bool r1 = _eternalStorage.setUintInMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet, _getBalanceOnHold(wallet).add(amount));
+        bool r2 = _eternalStorage.setUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD, _getTotalSupplyOnHold().add(amount));
         return r1 && r2;
     }
 
-    function _substractBalanceOnHold(address account, uint256 amount) private returns (bool) {
-        bool r1 = setUintInMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, account, _getBalanceOnHold(account).sub(amount));
-        bool r2 = setUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD, _getTotalSupplyOnHold().sub(amount));
+    function _substractBalanceOnHold(address wallet, uint256 amount) private returns (bool) {
+        bool r1 = _eternalStorage.setUintInMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet, _getBalanceOnHold(wallet).sub(amount));
+        bool r2 = _eternalStorage.setUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD, _getTotalSupplyOnHold().sub(amount));
         return r1 && r2;
     }
 
@@ -255,17 +232,20 @@ contract HoldsLedger is EternalStorageWrapper {
         holdDoesNotExist(issuer, transactionId)
         returns (uint256)
     {
-        pushStringToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, transactionId);
-        pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_ISSUERS, issuer);
-        pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_FROMS, from);
-        pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_TOS, to);
-        pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_NOTARIES, notary);
-        pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_AMOUNTS, amount);
-        pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRATIONS, expiration);
-        pushBoolToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRES, expires);
-        pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_STATUS_CODES, status);
-        uint256 index = _getManyHolds();
-        setUintInDoubleMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, issuer, transactionId, index);
+        _eternalStorage.pushStringToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, transactionId);
+        _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_ISSUERS, issuer);
+        _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_FROMS, from);
+        _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_TOS, to);
+        _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_NOTARIES, notary);
+        _eternalStorage.pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_AMOUNTS, amount);
+        _eternalStorage.pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRATIONS, expiration);
+        _eternalStorage.pushBoolToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRES, expires);
+        _eternalStorage.pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_STATUS_CODES, status);
+        return _recordIndexInMapping(issuer, transactionId, _getManyHolds());
+    }
+
+    function _recordIndexInMapping(address issuer, string memory transactionId, uint256 index) private returns (uint256){
+        _eternalStorage.setUintInDoubleMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, issuer, transactionId, index);
         return index;
     }
 

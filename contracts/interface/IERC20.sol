@@ -30,20 +30,6 @@ interface IERC20 {
     function approve(address spender, uint256 value) external returns (bool);
 
     /**
-     * @notice Method to increase approval
-     * @param spender The address which will spend the funds.
-     * @param value The amount of tokens to be spent.
-     */
-    function increaseApproval(address spender, uint256 value) external returns (bool);
-
-    /**
-     * @notice Method to decrease approval
-     * @param spender The address which will spend the funds.
-     * @param value The amount of tokens to be spent.
-     */
-    function decreaseApproval(address spender, uint256 value) external returns (bool);
-
-    /**
      * @notice Transfer tokens from one address to another.
      * Note that while this function emits an Approval event, this is not required as per the specification,
      * and other compliant implementations may not emit the event.
@@ -60,10 +46,10 @@ interface IERC20 {
 
     /**
     * @notice Gets the balance of the specified address.
-    * @param owner The address to query the balance of.
+    * @param wallet The address to query the balance of.
     * @return An uint256 representing the amount owned by the passed address.
     */
-    function balanceOf(address owner) external view returns (uint256);
+    function balanceOf(address wallet) external view returns (uint256);
 
     /**
      * @notice Function to check the amount of tokens that an owner allowed to a spender.

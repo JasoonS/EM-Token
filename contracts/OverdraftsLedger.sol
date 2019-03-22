@@ -1,6 +1,6 @@
 pragma solidity ^0.5;
 
-import "./EternalStorageWrapper.sol";
+import "./EternalStorageConnector.sol";
 import "./libraries/SafeMath.sol";
 
 /**
@@ -15,7 +15,7 @@ import "./libraries/SafeMath.sol";
  * @dev This contract is intended to be used from a higher order ERC20 token implementation (i.e.
  * inherting from this one)
  */
-contract OverdraftsLedger is EternalStorageWrapper {
+contract OverdraftsLedger is EternalStorageConnector {
 
     using SafeMath for uint256;
 
@@ -36,35 +36,35 @@ contract OverdraftsLedger is EternalStorageWrapper {
 
     // Events
 
-    event OverdraftDrawn(address indexed account, uint256 amount);
-    event OverdraftRestored(address indexed account, uint256 amount);
+    event OverdraftDrawn(address indexed wallet, uint256 amount);
+    event OverdraftRestored(address indexed wallet, uint256 amount);
 
     // Internal functions
 
-    function _unsecuredOverdraftLimit(address account) internal view returns (uint256) {
-        return _getUnsecuredOverdraftLimit(account);
+    function _unsecuredOverdraftLimit(address wallet) internal view returns (uint256) {
+        return _getUnsecuredOverdraftLimit(wallet);
     }
 
-    function _drawnAmount(address account) internal view returns (uint256) {
-        return _getDrawnAmount(account);
+    function _drawnAmount(address wallet) internal view returns (uint256) {
+        return _getDrawnAmount(wallet);
     }
 
-    function _setUnsecuredOverdraftLimit(address account, uint256 newLimit) internal returns (bool) {
-        return _writeUnsecuredOverdraftLimit(account, newLimit);
+    function _setUnsecuredOverdraftLimit(address wallet, uint256 newLimit) internal returns (bool) {
+        return _writeUnsecuredOverdraftLimit(wallet, newLimit);
     }
 
-    function _drawFromOverdraft(address account, uint256 amount) internal returns (bool) {
-        uint256 newAmount = _getDrawnAmount(account).add(amount);
+    function _drawFromOverdraft(address wallet, uint256 amount) internal returns (bool) {
+        uint256 newAmount = _getDrawnAmount(wallet).add(amount);
         uint256 newTotalAmount = _getTotalDrawnAmount().add(amount);
-        emit OverdraftDrawn(account, amount);
-        return _setDrawnAmounts(account, newAmount) && _setTotalDrawnAmount(newTotalAmount);
+        emit OverdraftDrawn(wallet, amount);
+        return _setDrawnAmounts(wallet, newAmount) && _setTotalDrawnAmount(newTotalAmount);
     }
 
-    function _restoreOverdraft(address account, uint256 amount) internal returns (bool) {
-        uint256 newAmount = _getDrawnAmount(account).sub(amount);
+    function _restoreOverdraft(address wallet, uint256 amount) internal returns (bool) {
+        uint256 newAmount = _getDrawnAmount(wallet).sub(amount);
         uint256 newTotalAmount = _getTotalDrawnAmount().sub(amount);
-        emit OverdraftRestored(account, amount);
-        return _setDrawnAmounts(account, newAmount) && _setTotalDrawnAmount(newTotalAmount);
+        emit OverdraftRestored(wallet, amount);
+        return _setDrawnAmounts(wallet, newAmount) && _setTotalDrawnAmount(newTotalAmount);
     }
 
     function _totalDrawnAmount() internal view returns (uint256) {
@@ -73,28 +73,28 @@ contract OverdraftsLedger is EternalStorageWrapper {
 
     // Private functions
 
-    function _getUnsecuredOverdraftLimit(address account) private view returns (uint256) {
-        return getUintFromMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, account);
+    function _getUnsecuredOverdraftLimit(address wallet) private view returns (uint256) {
+        return _eternalStorage.getUintFromMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet);
     }
 
-    function _writeUnsecuredOverdraftLimit(address account, uint256 value) private returns (bool) {
-        return setUintInMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, account, value);
+    function _writeUnsecuredOverdraftLimit(address wallet, uint256 value) private returns (bool) {
+        return _eternalStorage.setUintInMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet, value);
     }
 
-    function _getDrawnAmount(address account) private view returns (uint256) {
-        return getUintFromMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, account);
+    function _getDrawnAmount(address wallet) private view returns (uint256) {
+        return _eternalStorage.getUintFromMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet);
     }
 
-    function _setDrawnAmounts(address account, uint256 value) private returns (bool) {
-        return setUintInMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, account, value);
+    function _setDrawnAmounts(address wallet, uint256 value) private returns (bool) {
+        return _eternalStorage.setUintInMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet, value);
     }
 
     function _getTotalDrawnAmount() private view returns (uint256) {
-        return getUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS);
+        return _eternalStorage.getUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS);
     }
 
     function _setTotalDrawnAmount(uint256 value) private returns (bool) {
-        return setUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, value);
+        return _eternalStorage.setUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, value);
     }
 
 }

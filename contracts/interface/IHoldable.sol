@@ -14,22 +14,21 @@ interface IHoldable {
     }
 
     event HoldCreated(
-        address issuer,
+        address indexed issuer,
         string  indexed transactionId,
-        address indexed from,
+        address from,
         address to,
         address indexed notary,
         uint256 amount,
         bool    expires,
-        uint256 expiration,
-        uint256 index
+        uint256 expiration
     ); // By issuer (which can be the payer as well)
 
-    event HoldExecuted(address issuer, string indexed transactionId, HoldStatusCode status); // By notary or by operator
+    event HoldExecuted(address indexed issuer, string indexed transactionId, HoldStatusCode status); // By notary or by operator
 
-    event HoldReleased(address issuer, string indexed transactionId, HoldStatusCode status); // By issuer), by notary, or due to expiration
+    event HoldReleased(address indexed issuer, string indexed transactionId, HoldStatusCode status); // By issuer), by notary, or due to expiration
 
-    event HoldRenewed(address issuer, string indexed transactionId, uint256 oldExpiration, uint256 newExpiration); // By issuer
+    event HoldRenewed(address indexed issuer, string indexed transactionId, uint256 oldExpiration, uint256 newExpiration); // By issuer
 
     /**
      * @notice This function allows wallet owners to approve other addresses to perform holds on their behalf
@@ -58,8 +57,6 @@ interface IHoldable {
      * @param expires A flag specifying whether the hold can expire or not
      * @param timeToExpiration (only relevant when expires==true) The time to be added to the currrent block.timestamp to
      * establish the expiration time for the hold. After the expiration time anyone can actually trigger the release of the hold
-     * @return The index in the array where the hold is actually created and stored (this is an unique identifier
-     * throughout the whole contract)
      */
     function hold(
         string  calldata transactionId,
@@ -70,7 +67,7 @@ interface IHoldable {
         uint256 timeToExpiration
     )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Function to perform a hold on behalf of a wallet owner (the payer, entered in the "from" address) in favor of
@@ -86,8 +83,6 @@ interface IHoldable {
      * @param expires A flag specifying whether the hold can expire or not
      * @param timeToExpiration (only relevant when expires==true) The time to be added to the currrent block.timestamp to
      * establish the expiration time for the hold. After the expiration time anyone can actually trigger the release of the hold
-     * @return The index in the array where the hold is actually created and stored (this is an unique identifier
-     * throughout the whole contract)
      */
     function holdFrom(
         string  calldata transactionId,
@@ -99,7 +94,7 @@ interface IHoldable {
         uint256 timeToExpiration
     )
         external
-        returns (uint256 index);
+        returns (bool);
 
     /**
      * @notice Function to release a hold (if at all possible)
@@ -140,7 +135,6 @@ interface IHoldable {
      * @notice Function to retrieve all the information available for a particular hold
      * @param issuer The address of the original sender of the hold
      * @param transactionId The ID of the hold in question
-     * @return index: the index of the hold (an unique identifier)
      * @return from: the wallet from which the tokens will be taken if the hold is executed
      * @return to: the wallet to which the tokens will be transferred if the hold is executed
      * @return notary: the address that will be executing or releasing the hold
@@ -155,7 +149,6 @@ interface IHoldable {
     function retrieveHoldData(address issuer, string calldata transactionId)
         external view
         returns (
-            uint256 index,
             address from,
             address to,
             address notary,
@@ -167,10 +160,10 @@ interface IHoldable {
 
     /**
      * @dev Function to know how much is locked on hold from a particular wallet
-     * @param account The address of the account
-     * @return The balance on hold for a particular account
+     * @param wallet The address of the wallet
+     * @return The balance on hold for a particular wallet
      */
-    function balanceOnHold(address account) external view returns (uint256);
+    function balanceOnHold(address wallet) external view returns (uint256);
 
     /**
      * @dev Function to know how much is locked on hold for all accounts

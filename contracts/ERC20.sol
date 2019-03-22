@@ -43,6 +43,24 @@ contract ERC20 is IERC20, Compliant {
     }
 
     /**
+     * @notice Transfer tokens from one address to another.
+     * Note that while this function emits an Approval event, this is not required as per the specification,
+     * and other compliant implementations may not emit the event.
+     * @param from address The address which you want to send tokens from
+     * @param to address The address which you want to transfer to
+     * @param value uint256 the amount of tokens to be transferred
+     */
+    function transferFrom(address from, address to, uint256 value) external returns (bool) {
+        _check(_checkTransfer, from, to, value);
+        uint256 newApproval = _allowance(from, msg.sender).sub(value);
+        _approve(from, msg.sender, newApproval);
+        emit Approval(from, msg.sender, newApproval);
+        return _transfer(from, to, value);
+    }
+
+    // Additional (non standard) user functions
+
+    /**
      * @notice Method to increase approval
      * @param spender The address which will spend the funds.
      * @param value The amount of tokens to be spent.
@@ -68,22 +86,6 @@ contract ERC20 is IERC20, Compliant {
         return true;
     }
 
-    /**
-     * @notice Transfer tokens from one address to another.
-     * Note that while this function emits an Approval event, this is not required as per the specification,
-     * and other compliant implementations may not emit the event.
-     * @param from address The address which you want to send tokens from
-     * @param to address The address which you want to transfer to
-     * @param value uint256 the amount of tokens to be transferred
-     */
-    function transferFrom(address from, address to, uint256 value) external returns (bool) {
-        _check(_checkTransfer, from, to, value);
-        uint256 newApproval = _allowance(from, msg.sender).sub(value);
-        _approve(from, msg.sender, newApproval);
-        emit Approval(from, msg.sender, newApproval);
-        return _transfer(from, to, value);
-    }
-
     // External view functions
 
     /**
@@ -95,11 +97,11 @@ contract ERC20 is IERC20, Compliant {
 
     /**
     * @notice Gets the balance of the specified address.
-    * @param owner The address to query the balance of.
+    * @param wallet The address to query the balance of.
     * @return An uint256 representing the amount owned by the passed address.
     */
-    function balanceOf(address owner) external view returns (uint256) {
-        return _balanceOf(owner);
+    function balanceOf(address wallet) external view returns (uint256) {
+        return _balanceOf(wallet);
     }
 
     /**

@@ -1,6 +1,6 @@
 pragma solidity ^0.5;
 
-import "./EternalStorageWrapper.sol";
+import "./EternalStorageConnector.sol";
 import "./libraries/SafeMath.sol";
 
 /**
@@ -14,7 +14,7 @@ import "./libraries/SafeMath.sol";
  * inherting from this one)
  *
  */
-contract ERC20Ledger is EternalStorageWrapper {
+contract ERC20Ledger is EternalStorageConnector {
 
     using SafeMath for uint256;
 
@@ -34,8 +34,8 @@ contract ERC20Ledger is EternalStorageWrapper {
 
     // Events
     
-    event BalanceIncrease(address indexed account, uint256 value);
-    event BalanceDecrease(address indexed account, uint256 value);
+    event BalanceIncrease(address indexed wallet, uint256 value);
+    event BalanceDecrease(address indexed wallet, uint256 value);
 
     // Modifiers
 
@@ -50,21 +50,21 @@ contract ERC20Ledger is EternalStorageWrapper {
         return _setAllowance(allower, spender, value);
     }
 
-    function _increaseBalance(address account, uint256 value) internal returns (bool) {
-        uint256 newBalance = _getBalance(account).add(value);
+    function _increaseBalance(address wallet, uint256 value) internal returns (bool) {
+        uint256 newBalance = _getBalance(wallet).add(value);
         uint256 newTotalSupply = _getTotalSupply().add(value);
-        bool r1 = _setBalance(account, newBalance);
+        bool r1 = _setBalance(wallet, newBalance);
         bool r2 = _setTotalSupply(newTotalSupply);
-        emit BalanceIncrease(account, value);
+        emit BalanceIncrease(wallet, value);
         return r1 && r2;
     }
 
-    function _decreaseBalance(address account, uint256 value) internal returns (bool) {
-        uint256 newBalance = _getBalance(account).sub(value);
+    function _decreaseBalance(address wallet, uint256 value) internal returns (bool) {
+        uint256 newBalance = _getBalance(wallet).sub(value);
         uint256 newTotalSupply = _getTotalSupply().sub(value);
-        bool r1 = _setBalance(account, newBalance);
+        bool r1 = _setBalance(wallet, newBalance);
         bool r2 = _setTotalSupply(newTotalSupply);
-        emit BalanceDecrease(account, value);
+        emit BalanceDecrease(wallet, value);
         return r1 && r2;
     }
 
@@ -83,27 +83,27 @@ contract ERC20Ledger is EternalStorageWrapper {
     // Private functions
 
     function _getBalance(address owner) private view returns (uint256) {
-        return getUintFromMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner);
+        return _eternalStorage.getUintFromMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner);
     }
 
     function _setBalance(address owner, uint256 value) private returns (bool) {
-        return setUintInMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner, value);
+        return _eternalStorage.setUintInMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner, value);
     }
 
     function _getAllowance(address owner, address spender) private view returns (uint256) {
-        return getUintFromDoubleMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender);
+        return _eternalStorage.getUintFromDoubleMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender);
     }
 
     function _setAllowance(address owner, address spender, uint256 value) private returns (bool) {
-        return setUintInDoubleMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender, value);
+        return _eternalStorage.setUintInDoubleMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender, value);
     }
 
     function _getTotalSupply() private view returns (uint256) {
-        return getUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY);
+        return _eternalStorage.getUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY);
     }
 
     function _setTotalSupply(uint256 value) private returns (bool) {
-        return setUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY, value);
+        return _eternalStorage.setUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY, value);
     }
 
 }

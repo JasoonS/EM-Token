@@ -27,18 +27,18 @@ contract Compliant is ICompliant, ConsolidatedLedger, Whitelistable {
         return _checkTransfer(from, to, value);
     }
 
-    function checkApprove(address allower, address spender, uint256 value) external view
+    function checkApprove(address owner, address spender, uint256 value) external view
         returns (bool canDo, string memory reason)
     {
-        return _checkApprove(allower, spender, value);
+        return _checkApprove(owner, spender, value);
     }
 
     // Holdable
 
-    function checkHold(address payer, address payee, address notary, uint256 value) external view
+    function checkHold(address from, address to, address notary, uint256 value) external view
         returns (bool canDo, string memory reason)
     {
-        return _checkHold(payer, payee, notary, value);
+        return _checkHold(from, to, notary, value);
     }
 
     function checkApproveToHold(address payer, address holder) external view
@@ -55,10 +55,10 @@ contract Compliant is ICompliant, ConsolidatedLedger, Whitelistable {
         return _checkApproveToOrderClearedTransfer(fromWallet, requester);
     }
 
-    function checkOrderClearedTransfer(address fromWallet, address toWallet, uint256 value) external view
+    function checkOrderClearedTransfer(address from, address to, uint256 value) external view
         returns (bool canDo, string memory reason)
     {
-        return _checkOrderClearedTransfer(fromWallet, toWallet, value);
+        return _checkOrderClearedTransfer(from, to, value);
     }
 
     // Fundable

@@ -100,38 +100,51 @@ contract Fundable is IFundable, Compliant {
 
     /**
      * @notice Method for a wallet owner to request funding from the tokenizer on his/her own behalf
+     * @param transactionId The ID of the funding request, which can then be used to index all the information about
+     * the funding request (together with the address of the sender)
      * @param amount The amount requested
      * @param instructions The instructions for the funding request - e.g. routing information about the bank
      * account to be debited (normally a hash / reference to the actual information in an external repository),
      * or a code to indicate that the tokenization entity should use the default bank account associated with
      * the wallet
-     * @return The index of the entry of the new funding request in the internal array where it is stored
      */
-    function requestFunding(string calldata transactionId, uint256 amount, string calldata instructions)
+    function requestFunding(
+        string calldata transactionId,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         address walletToFund = msg.sender;
         _check(_checkRequestFunding, walletToFund, requester, amount);
-        index = _createFundingRequest(requester, transactionId, walletToFund, amount, instructions);
+        _createFundingRequest(requester, transactionId, walletToFund, amount, instructions);
+        return true;
     }
 
     /**
      * @notice Method to request funding on behalf of a (different) wallet owner (analogous to "transferFrom" in
      * classical ERC20). The requester needs to be previously approved
+     * @param transactionId The ID of the funding request, which can then be used to index all the information about
+     * the funding request (together with the address of the sender)
      * @param walletToFund The address of the wallet which will receive the funding
      * @param amount The amount requested
      * @param instructions The debit instructions, as is "requestFunding"
-     * @return The index of the entry of the new funding request in the internal array where it is stored
      */
-    function requestFundingFrom(string calldata transactionId, address walletToFund, uint256 amount, string calldata instructions)
+    function requestFundingFrom(
+        string calldata transactionId,
+        address walletToFund,
+        uint256 amount,
+        string calldata instructions
+    )
         external
-        returns (uint256 index)
+        returns (bool)
     {
         address requester = msg.sender;
         _check(_checkRequestFunding, walletToFund, requester, amount);
-        index = _createFundingRequest(requester, transactionId, walletToFund, amount, instructions);
+        _createFundingRequest(requester, transactionId, walletToFund, amount, instructions);
+        return true;
     }
 
     /**
@@ -166,9 +179,9 @@ contract Fundable is IFundable, Compliant {
      */
     function processFundingRequest(address requester, string calldata transactionId) external
         fundingRequestJustCreated(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getFundingIndex(requester, transactionId);
         _setFundingStatus(index, FundingRequestStatusCode.InProcess);
         emit FundingRequestInProcess(requester, transactionId);
@@ -187,9 +200,9 @@ contract Fundable is IFundable, Compliant {
      */
     function executeFundingRequest(address requester, string calldata transactionId) external
         fundingRequestNotClosed(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getFundingIndex(requester, transactionId);
         address walletToFund = _getWalletToFund(index);
         uint256 amount = _getFundingAmount(index);
@@ -210,9 +223,9 @@ contract Fundable is IFundable, Compliant {
      */
     function rejectFundingRequest(address requester, string calldata transactionId, string calldata reason) external
         fundingRequestNotClosed(requester, transactionId)
-        onlyRole(OPERATOR_ROLE)
         returns (bool)
     {
+        requireRole(OPERATOR_ROLE);
         uint256 index = _getFundingIndex(requester, transactionId);
         emit FundingRequestRejected(requester, transactionId, reason);
         return _setFundingStatus(index, FundingRequestStatusCode.Rejected);
@@ -234,17 +247,24 @@ contract Fundable is IFundable, Compliant {
      * @notice Function to retrieve all the information available for a particular funding request
      * @param requester The requester of the funding request
      * @param transactionId The ID of the funding request
-     * @return index: the index of the array where the request is stored
      * @return walletToFund: the wallet to which the requested funds are directed to
      * @return amount: the amount of funds requested
      * @return instructions: the routing instructions to determine the source of the funds being requested
      * @return status: the current status of the funding request
      */
-    function retrieveFundingData(address requester, string calldata transactionId)
+    function retrieveFundingData(
+        address requester,
+        string calldata transactionId
+    )
         external view
-        returns (uint256 index, address walletToFund, uint256 amount, string memory instructions, FundingRequestStatusCode status)
+        returns (
+            address walletToFund,
+            uint256 amount,
+            string memory instructions,
+            FundingRequestStatusCode status
+        )
     {
-        index = _getFundingIndex(requester, transactionId);
+        uint256 index = _getFundingIndex(requester, transactionId);
         walletToFund = _getWalletToFund(index);
         amount = _getFundingAmount(index);
         instructions = _getFundingInstructions(index);
@@ -287,11 +307,11 @@ contract Fundable is IFundable, Compliant {
     // Private functions
 
     function _manyFundingRequests() private view returns (uint256 many) {
-        return getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS, 0);
+        return _eternalStorage.getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS, 0);
     }
 
     function _getFundingRequester(uint256 index) private view fundingRequestIndexExists(index) returns (address requester) {
-        requester = getAddressFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_REQUESTERS, index);
+        requester = _eternalStorage.getAddressFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_REQUESTERS, index);
     }
 
     function _getFundingIndex(
@@ -302,45 +322,45 @@ contract Fundable is IFundable, Compliant {
         fundingRequestExists(requester, transactionId)
         returns (uint256 index)
     {
-        index = getUintFromDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId);
+        index = _eternalStorage.getUintFromDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId);
     }
 
     function _gettransactionId(uint256 index) private view fundingRequestIndexExists(index) returns (string memory transactionId) {
-        transactionId = getStringFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, index);
+        transactionId = _eternalStorage.getStringFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, index);
     }
 
     function _getWalletToFund(uint256 index) private view fundingRequestIndexExists(index) returns (address walletToFund) {
-        walletToFund = getAddressFromArray(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, index);
+        walletToFund = _eternalStorage.getAddressFromArray(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, index);
     }
 
     function _getFundingAmount(uint256 index) private view fundingRequestIndexExists(index) returns (uint256 amount) {
-        amount = getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, index);
+        amount = _eternalStorage.getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, index);
     }
 
     function _getFundingInstructions(uint256 index) private view fundingRequestIndexExists(index) returns (string memory instructions) {
-        instructions = getStringFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, index);
+        instructions = _eternalStorage.getStringFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, index);
     }
 
     function _getFundingStatus(uint256 index) private view fundingRequestIndexExists(index) returns (FundingRequestStatusCode status) {
-        status = FundingRequestStatusCode(getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, index));
+        status = FundingRequestStatusCode(_eternalStorage.getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, index));
     }
 
     function _setFundingStatus(uint256 index, FundingRequestStatusCode status) private fundingRequestIndexExists(index) returns (bool) {
-        return setUintInArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, index, uint256(status));
+        return _eternalStorage.setUintInArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, index, uint256(status));
     }
 
     function _approveToRequestFunding(address walletToFund, address requester) private returns (bool) {
         emit ApprovalToRequestFunding(walletToFund, requester);
-        return setBoolInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, true);
+        return _eternalStorage.setBoolInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, true);
     }
 
     function _revokeApprovalToRequestFunding(address walletToFund, address requester) private returns (bool) {
         emit RevokeApprovalToRequestFunding(walletToFund, requester);
-        return setBoolInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, false);
+        return _eternalStorage.setBoolInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, false);
     }
 
     function _isApprovedToRequestFunding(address walletToFund, address requester) public view returns (bool){
-        return getBoolFromDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester);
+        return _eternalStorage.getBoolFromDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester);
     }
 
     function _createFundingRequest(address requester, string memory transactionId, address walletToFund, uint256 amount, string memory instructions)
@@ -349,15 +369,15 @@ contract Fundable is IFundable, Compliant {
         returns (uint256 index)
     {
         require(requester == walletToFund || _isApprovedToRequestFunding(walletToFund, requester), "Not approved to request funding");
-        pushAddressToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_REQUESTERS, requester);
-        pushStringToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS, transactionId);
-        pushAddressToArray(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, walletToFund);
-        pushUintToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, amount);
-        pushStringToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, instructions);
-        pushUintToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, uint256(FundingRequestStatusCode.Requested));
+        _eternalStorage.pushAddressToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_REQUESTERS, requester);
+        _eternalStorage.pushStringToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS, transactionId);
+        _eternalStorage.pushAddressToArray(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, walletToFund);
+        _eternalStorage.pushUintToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, amount);
+        _eternalStorage.pushStringToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, instructions);
+        _eternalStorage.pushUintToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, uint256(FundingRequestStatusCode.Requested));
         index = _manyFundingRequests();
-        setUintInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId, index);
-        emit FundingRequested(requester, transactionId, walletToFund, amount, instructions, index);
+        _eternalStorage.setUintInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId, index);
+        emit FundingRequested(requester, transactionId, walletToFund, amount, instructions);
         return index;
     }
 
