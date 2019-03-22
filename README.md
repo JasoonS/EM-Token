@@ -190,6 +190,7 @@ function chargeInterest(address wallet, uint256 amount) external returns (bool);
 // require(msg.sender == _interestEngine, "Only the interest engine can charge interest");
 ```
 
+
 Charging interest results in an event being sent:
 
 ```
