@@ -125,16 +125,16 @@ contract RoleControl is EternalStorageConnector {
 
     function _addRole(address _account, bytes32 role) private returns (bool) {
         emit RoleAdded(_account, role);
-        return _eternalStorage.setBoolInDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, _account, true);
+        return _eternalStorage.setBoolInDoubleBytes32AddressMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, _account, true);
     }
 
     function _removeRole(address account, bytes32 role) private returns (bool) {
         emit RoleRemoved(account, role);
-        return _eternalStorage.deleteBoolFromDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
+        return _eternalStorage.deleteBoolFromDoubleBytes32AddressMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
     }
 
     function _hasRole(address account, bytes32 role) public view returns (bool) {
-        return _eternalStorage.getBoolFromDoubleMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
+        return _eternalStorage.getBoolFromDoubleBytes32AddressMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
     }
 
 }

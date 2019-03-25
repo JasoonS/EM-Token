@@ -322,11 +322,11 @@ contract Holdable is IHoldable, Compliant {
     // Private functions
 
     function _getHoldingApproval(address wallet, address holder) private view returns (bool) {
-        return _eternalStorage.getBoolFromDoubleMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder);
+        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder);
     }
 
     function _setHoldingApproval(address wallet, address holder, bool value) private returns (bool) {
-        return _eternalStorage.setBoolInDoubleMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder, value);
+        return _eternalStorage.setBoolInDoubleAddressAddressMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder, value);
     }
 
     function _hold(

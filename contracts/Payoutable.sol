@@ -1,6 +1,5 @@
 pragma solidity ^0.5;
 
-import "./libraries/SafeMath.sol";
 import "./Compliant.sol";
 import "./interface/IPayoutable.sol";
 
@@ -337,7 +336,7 @@ contract Payoutable is IPayoutable, Compliant {
         payoutRequestExists(requester, transactionId)
         returns (uint256 index)
     {
-        index = _eternalStorage.getUintFromDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId);
+        index = _eternalStorage.getUintFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId);
     }
 
     function _getPayoutTransactionId(uint256 index) private view payoutRequestIndexExists(index) returns (string memory transactionId) {
@@ -366,16 +365,16 @@ contract Payoutable is IPayoutable, Compliant {
 
     function _approveToRequestPayout(address walletToDebit, address requester) private returns (bool) {
         emit ApprovalToRequestPayout(walletToDebit, requester);
-        return _eternalStorage.setBoolInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, true);
+        return _eternalStorage.setBoolInDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, true);
     }
 
     function _revokeApprovalToRequestPayout(address walletToDebit, address requester) private returns (bool) {
         emit RevokeApprovalToRequestPayout(walletToDebit, requester);
-        return _eternalStorage.setBoolInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, false);
+        return _eternalStorage.setBoolInDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester, false);
     }
 
     function _isApprovedToRequestPayout(address walletToDebit, address requester) public view returns (bool){
-        return _eternalStorage.getBoolFromDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester);
+        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, requester);
     }
 
     function _createPayoutRequest(address requester, string memory transactionId, address walletToDebit, uint256 amount, string memory instructions)
@@ -393,7 +392,7 @@ contract Payoutable is IPayoutable, Compliant {
         _eternalStorage.pushStringToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, instructions);
         _eternalStorage.pushUintToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, uint256(PayoutRequestStatusCode.Requested));
         index = _manyPayoutRequests();
-        _eternalStorage.setUintInDoubleMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId, index);
+        _eternalStorage.setUintInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, requester, transactionId, index);
         emit PayoutRequested(requester, transactionId, walletToDebit, amount, instructions);
         return index;
     }

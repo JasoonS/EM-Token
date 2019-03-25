@@ -2,27 +2,28 @@ pragma solidity ^0.5;
 
 interface IFundable {
 
-    enum FundingRequestStatusCode { Nonexistent, Requested, InProcess, Executed, Rejected, Cancelled }
+    enum FundingStatusCode { Nonexistent, Ordered, InProcess, Executed, Rejected, Cancelled }
 
-    event FundingRequested(
-        address indexed requester,
-        string indexed transactionId,
+    event FundingOrdered(
+        address indexed orderer,
+        string indexed operationId,
         address indexed walletToFund,
         uint256 amount,
         string instructions
     );
 
-    event FundingRequestInProcess(address indexed requester, string indexed transactionId);
+    event FundingInProcess(address indexed orderer, string indexed operationId);
 
-    event FundingRequestExecuted(address indexed requester, string indexed transactionId);
+    event FundingExecuted(address indexed orderer, string indexed operationId);
 
-    event FundingRequestRejected(address indexed requester, string indexed transactionId, string reason);
+    event FundingRejected(address indexed orderer, string indexed operationId, string reason);
 
-    event FundingRequestCancelled(address indexed requester, string indexed transactionId);
+    event FundingCancelled(address indexed orderer, string indexed operationId);
 
-    event ApprovalToRequestFunding(address indexed walletToFund, address indexed requester);
+    event ApprovalToOrderFunding(address indexed walletToFund, address indexed orderer);
 
-    event RevokeApprovalToRequestFunding(address indexed walletToFund, address indexed requester);
+    event RevokeApprovalToOrderFunding(address indexed walletToFund, address indexed orderer);
+
 
     /**
      * @notice This function allows wallet owners to approve other addresses to request funding on their behalf
@@ -30,13 +31,13 @@ interface IFundable {
      * as a "yes or no" flag
      * @param requester The address to be approved as potential issuer of funding requests
      */
-    function approveToRequestFunding(address requester) external returns (bool);
+    function approveToOrderFunding(address orderer) external returns (bool);
 
     /**
      * @notice This function allows wallet owners to revoke funding request privileges from previously approved addresses
      * @param requester The address to be revoked as potential issuer of funding requests
      */
-    function revokeApprovalToRequestFunding(address requester) external returns (bool) ;
+    function revokeApprovalToOrderFunding(address orderer) external returns (bool) ;
 
     /**
      * @notice Method for a wallet owner to request funding from the tokenizer on his/her own behalf
@@ -46,8 +47,8 @@ interface IFundable {
      * or a code to indicate that the tokenization entity should use the default bank account associated with
      * the wallet
      */
-    function requestFunding(
-        string calldata transactionId,
+    function orderFunding(
+        string calldata operationId,
         uint256 amount,
         string calldata instructions
     )
@@ -61,8 +62,8 @@ interface IFundable {
      * @param amount The amount requested
      * @param instructions The debit instructions, as is "requestFunding"
      */
-    function requestFundingFrom(
-        string calldata transactionId,
+    function orderFundingFrom(
+        string calldata operationId,
         address walletToFund,
         uint256 amount,
         string calldata instructions
@@ -76,7 +77,7 @@ interface IFundable {
      * the funding request (together with the address of the sender)
      * @dev Only the original requester can actually cancel an outstanding request
      */
-    function cancelFundingRequest(string calldata transactionId) external returns (bool);
+    function cancelFunding(string calldata operationId) external returns (bool);
 
     /**
      * @notice Function to be called by the tokenizer administrator to start processing a funding request. It simply
@@ -91,7 +92,7 @@ interface IFundable {
      * @dev Only operator can do this
      * 
      */
-    function processFundingRequest(address requester, string calldata transactionId) external returns (bool);
+    function processFunding(address orderer, string calldata operationId) external returns (bool);
 
     /**
      * @notice Function to be called by the tokenizer administrator to honor a funding request. After debiting the
@@ -103,7 +104,7 @@ interface IFundable {
      * @dev Only operator can do this
      * 
      */
-    function executeFundingRequest(address requester, string calldata transactionId) external returns (bool);
+    function executeFunding(address orderer, string calldata operationId) external returns (bool);
 
     /**
      * @notice Function to be called by the tokenizer administrator to reject a funding request
@@ -114,7 +115,7 @@ interface IFundable {
      * @dev Only operator can do this
      * 
      */
-    function rejectFundingRequest(address requester, string calldata transactionId, string calldata reason) external returns (bool);
+    function rejectFunding(address orderer, string calldata operationId, string calldata reason) external returns (bool);
 
     /**
      * @notice View method to read existing allowances to request funding
@@ -122,7 +123,7 @@ interface IFundable {
      * @param requester The address that can request funding on behalf of the wallet owner
      * @return Whether the address is approved or not to request funding on behalf of the wallet owner
      */
-    function isApprovedToRequestFunding(address walletToFund, address requester) external view returns (bool);
+    function isApprovedToOrderFunding(address walletToFund, address orderer) external view returns (bool);
 
     /**
      * @notice Function to retrieve all the information available for a particular funding request
@@ -133,13 +134,16 @@ interface IFundable {
      * @return instructions: the routing instructions to determine the source of the funds being requested
      * @return status: the current status of the funding request
      */
-    function retrieveFundingData(address requester, string calldata transactionId)
+    function retrieveFundingData(
+        address orderer,
+        string calldata operationId
+    )
         external view
         returns (
             address walletToFund,
             uint256 amount,
             string memory instructions,
-            FundingRequestStatusCode status
+            FundingStatusCode status
         );
         
 }

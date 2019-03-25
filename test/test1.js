@@ -2,60 +2,67 @@ const EMoneyToken = artifacts.require("EMoneyToken");
 
 contract("EMoneyToken", accounts => {
     var instance
-    var ownerAccount = accounts[0]
-    var userAccount1 = accounts[1]
-    var userAccount2 = accounts[2]
+    var owner = accounts[9]
+    var cro = accounts[8]
+    var operator = accounts[7]
+    var compliance = accounts[6]
+    var userAccount1 = accounts[5]
+    var userAccount2 = accounts[4]
     var userAccount3 = accounts[3]
-    var userAccount4 = accounts[4]
+    var notary1 = accounts[2]
+    var notWhilisted1 = accounts[1]
+    var notWhilisted2 = accounts[0]
   
-    var Name = 'My Token Contract'
+    var Name = 'Test EMoneyToken'
     var Symbol = 'EMT-EUR'
     var Currency = 'EUR'
     var Decimals = 2
     var Version = "0.1.0"
+
+    var EternalStorageAddr = "0x76dD02b760968079B4d9Ba9E12C8c42D248A08E8"
+    var ZeroAddr = "0x0000000000000000000000000000000000000000"
   
     // runs before all tests
     before(done => {
-        EMoneyToken.new(Name,Symbol, Currency, Decimals, {from: ownerAccount})
+        EMoneyToken.new(Name,Symbol, Currency, Decimals, ZeroAddr, {from: owner, gas: 500000000})
         .then(_instance => {
             instance = _instance;
         })
         .then(done).catch(done);
     });
 
-
     //Now testing EM Token informational parameters (set at instantiation)
 
     it("Should start with the correct name", done => {
-        instance.name.call().then(_name => {
+        instance.name.call({from:owner}).then(_name => {
             assert.equal(_name, Name, "Name not set correctly");
         })
         .then(done).catch(done);
     });
 
     it("Should start with the correct symbol", done => {
-        instance.symbol.call().then(_symbol => {
+        instance.symbol.call({from:owner}).then(_symbol => {
             assert.equal(_symbol, Symbol, "Symbol not set correctly");
         })
         .then(done).catch(done);
     });
 
     it("Should start with the correct currency", done => {
-        instance.currency.call().then(_currency => {
+        instance.currency.call({from:owner}).then(_currency => {
             assert.equal(_currency, Currency, "Currency not set correctly");
         })
         .then(done).catch(done);
     });
 
     it("Should start with the correct number of decimals", done => {
-        instance.decimals.call().then(_decimals => {
+        instance.decimals.call({from:owner}).then(_decimals => {
             assert.equal(_decimals, Decimals, "Decimals not set correctly");
         })
         .then(done).catch(done);
     });
 
     it("Should havethe correct version", done => {
-        instance.ersion.call().then(_version => {
+        instance.ersion.call({from:owner}).then(_version => {
             assert.equal(_version, Version, "Wrong version!");
         })
         .then(done).catch(done);

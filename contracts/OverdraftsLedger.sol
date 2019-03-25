@@ -1,7 +1,6 @@
 pragma solidity ^0.5;
 
 import "./EternalStorageConnector.sol";
-import "./libraries/SafeMath.sol";
 
 /**
  * @title OverdraftsLedger
@@ -74,19 +73,19 @@ contract OverdraftsLedger is EternalStorageConnector {
     // Private functions
 
     function _getUnsecuredOverdraftLimit(address wallet) private view returns (uint256) {
-        return _eternalStorage.getUintFromMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet);
+        return _eternalStorage.getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet);
     }
 
     function _writeUnsecuredOverdraftLimit(address wallet, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet, value);
+        return _eternalStorage.setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet, value);
     }
 
     function _getDrawnAmount(address wallet) private view returns (uint256) {
-        return _eternalStorage.getUintFromMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet);
+        return _eternalStorage.getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet);
     }
 
     function _setDrawnAmounts(address wallet, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet, value);
+        return _eternalStorage.setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet, value);
     }
 
     function _getTotalDrawnAmount() private view returns (uint256) {

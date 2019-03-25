@@ -2,7 +2,6 @@ pragma solidity ^0.5;
 
 import "./Compliant.sol";
 import "./interface/IOverdraftable.sol";
-import "./libraries/SafeMath.sol";
 
 /**
  * @title Overdraftable - simple implementation of an overdraft line
@@ -104,10 +103,10 @@ contract Overdraftable is IOverdraftable, Compliant {
     // Private functions
 
     function _setInterestEngine(address wallet, address engine) private returns (bool) {
-        return _eternalStorage.setAddressInMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet, engine);
+        return _eternalStorage.setAddressInAddressMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet, engine);
     }
 
     function _getInterestEngine(address wallet) private view returns (address) {
-        return _eternalStorage.getAddressFromMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet);
+        return _eternalStorage.getAddressFromAddressMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet);
     }
 }

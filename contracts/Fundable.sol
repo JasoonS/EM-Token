@@ -1,6 +1,5 @@
 pragma solidity ^0.5;
 
-import "./libraries/SafeMath.sol";
 import "./Compliant.sol";
 import "./interface/IFundable.sol";
 
@@ -322,7 +321,7 @@ contract Fundable is IFundable, Compliant {
         fundingRequestExists(requester, transactionId)
         returns (uint256 index)
     {
-        index = _eternalStorage.getUintFromDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId);
+        index = _eternalStorage.getUintFromDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId);
     }
 
     function _gettransactionId(uint256 index) private view fundingRequestIndexExists(index) returns (string memory transactionId) {
@@ -351,16 +350,16 @@ contract Fundable is IFundable, Compliant {
 
     function _approveToRequestFunding(address walletToFund, address requester) private returns (bool) {
         emit ApprovalToRequestFunding(walletToFund, requester);
-        return _eternalStorage.setBoolInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, true);
+        return _eternalStorage.setBoolInDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, true);
     }
 
     function _revokeApprovalToRequestFunding(address walletToFund, address requester) private returns (bool) {
         emit RevokeApprovalToRequestFunding(walletToFund, requester);
-        return _eternalStorage.setBoolInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, false);
+        return _eternalStorage.setBoolInDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester, false);
     }
 
     function _isApprovedToRequestFunding(address walletToFund, address requester) public view returns (bool){
-        return _eternalStorage.getBoolFromDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester);
+        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, requester);
     }
 
     function _createFundingRequest(address requester, string memory transactionId, address walletToFund, uint256 amount, string memory instructions)
@@ -376,7 +375,7 @@ contract Fundable is IFundable, Compliant {
         _eternalStorage.pushStringToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, instructions);
         _eternalStorage.pushUintToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, uint256(FundingRequestStatusCode.Requested));
         index = _manyFundingRequests();
-        _eternalStorage.setUintInDoubleMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId, index);
+        _eternalStorage.setUintInDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, requester, transactionId, index);
         emit FundingRequested(requester, transactionId, walletToFund, amount, instructions);
         return index;
     }

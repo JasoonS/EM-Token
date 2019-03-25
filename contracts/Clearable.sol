@@ -2,7 +2,6 @@ pragma solidity ^0.5;
 
 import "./Compliant.sol";
 import "./interface/IClearable.sol";
-import "./libraries/SafeMath.sol";
 
 /**
  * @title Clearable
@@ -314,16 +313,16 @@ contract Clearable is IClearable, Compliant {
 
     function _approveToRequestClearedTransfer(address wallet, address requester) private returns (bool) {
         emit ApprovalToRequestClearedTransfer(wallet, requester);
-        return _eternalStorage.setBoolInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, true);
+        return _eternalStorage.setBoolInDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, true);
     }
 
     function _revokeApprovalToRequestClearedTransfer(address wallet, address requester) private returns (bool) {
         emit RevokeApprovalToRequestClearedTransfer(wallet, requester);
-        return _eternalStorage.setBoolInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, false);
+        return _eternalStorage.setBoolInDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester, false);
     }
 
     function _isApprovedToRequestClearedTransfer(address wallet, address requester) public view returns (bool){
-        return _eternalStorage.getBoolFromDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester);
+        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_APPROVALS, wallet, requester);
     }
 
     function _manyClearedTransferRequests() private view returns (uint256 many) {
@@ -342,7 +341,7 @@ contract Clearable is IClearable, Compliant {
         clearedTransferRequestExists(requester, transactionId)
         returns (uint256 index)
     {
-        index = _eternalStorage.getUintFromDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId);
+        index = _eternalStorage.getUintFromDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId);
     }
 
     function _gettransactionId(uint256 index) private view clearedTransferRequestIndexExists(index) returns (string memory transactionId) {
@@ -390,7 +389,7 @@ contract Clearable is IClearable, Compliant {
         _eternalStorage.pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_AMOUNTS, amount);
         _eternalStorage.pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_STATUS_CODES, uint256(ClearedTransferRequestStatusCode.Requested));
         index = _manyClearedTransferRequests();
-        _eternalStorage.setUintInDoubleMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId, index);
+        _eternalStorage.setUintInDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARED_TRANSFER_IDS_INDEXES, requester, transactionId, index);
         emit ClearedTransferRequested(requester, transactionId, from, to, amount);
         return index;
     }

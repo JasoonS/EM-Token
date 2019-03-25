@@ -1,7 +1,6 @@
 pragma solidity ^0.5;
 
 import "./EternalStorageConnector.sol";
-import "./libraries/SafeMath.sol";
 
 contract HoldsLedger is EternalStorageConnector {
 
@@ -150,7 +149,7 @@ contract HoldsLedger is EternalStorageConnector {
     }
 
     function _getHoldIndex(address issuer, string memory transactionId) private view holdExists(issuer, transactionId) returns (uint256) {
-        return _eternalStorage.getUintFromMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, transactionId);
+        return _eternalStorage.getUintFromStringMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, transactionId);
     }
 
     function _getHoldTransactionId(uint256 index) private view holdIndexExists(index) returns (string memory) {
@@ -198,7 +197,7 @@ contract HoldsLedger is EternalStorageConnector {
     }
 
     function _getBalanceOnHold(address wallet) private view returns (uint256) {
-        return _eternalStorage.getUintFromMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet);
+        return _eternalStorage.getUintFromAddressMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet);
     }
 
     function _getTotalSupplyOnHold() private view returns (uint256) {
@@ -206,13 +205,13 @@ contract HoldsLedger is EternalStorageConnector {
     }
 
     function _addBalanceOnHold(address wallet, uint256 amount) private returns (bool) {
-        bool r1 = _eternalStorage.setUintInMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet, _getBalanceOnHold(wallet).add(amount));
+        bool r1 = _eternalStorage.setUintInAddressMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet, _getBalanceOnHold(wallet).add(amount));
         bool r2 = _eternalStorage.setUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD, _getTotalSupplyOnHold().add(amount));
         return r1 && r2;
     }
 
     function _substractBalanceOnHold(address wallet, uint256 amount) private returns (bool) {
-        bool r1 = _eternalStorage.setUintInMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet, _getBalanceOnHold(wallet).sub(amount));
+        bool r1 = _eternalStorage.setUintInAddressMapping(HOLDSLEDGER_CONTRACT_NAME, _BALANCES_ON_HOLD, wallet, _getBalanceOnHold(wallet).sub(amount));
         bool r2 = _eternalStorage.setUint(HOLDSLEDGER_CONTRACT_NAME, _TOTAL_SUPPLY_ON_HOLD, _getTotalSupplyOnHold().sub(amount));
         return r1 && r2;
     }
@@ -245,7 +244,7 @@ contract HoldsLedger is EternalStorageConnector {
     }
 
     function _recordIndexInMapping(address issuer, string memory transactionId, uint256 index) private returns (uint256){
-        _eternalStorage.setUintInDoubleMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, issuer, transactionId, index);
+        _eternalStorage.setUintInDoubleAddressStringMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, issuer, transactionId, index);
         return index;
     }
 

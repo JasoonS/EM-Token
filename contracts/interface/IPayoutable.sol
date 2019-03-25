@@ -2,27 +2,28 @@ pragma solidity ^0.5;
 
 interface IPayoutable {
 
-    enum PayoutRequestStatusCode { Nonexistent, Requested, InProcess, Executed, Rejected, Cancelled }
+    enum PayoutStatusCode { Nonexistent, Ordered, InProcess, FundsInSuspense, Executed, Rejected, Cancelled }
 
-    event PayoutRequested(
-        address indexed requester,
-        string indexed transactionId,
+    event PayoutOrdered(
+        address indexed orderer,
+        string indexed operationId,
         address indexed walletToDebit,
         uint256 amount,
         string instructions
     );
 
-    event PayoutRequestInProcess(address indexed requester, string indexed transactionId);
+    event PayoutInProcess(address indexed orderer, string indexed operationId);
 
-    event PayoutRequestExecuted(address indexed requester, string indexed transactionId);
+    event PayoutExecuted(address indexed orderer, string indexed operationId);
 
-    event PayoutRequestRejected(address indexed requester, string indexed transactionId, string reason);
+    event PayoutRejected(address indexed orderer, string indexed operationId, string reason);
 
-    event PayoutRequestCancelled(address indexed requester, string indexed transactionId);
+    event PayoutCancelled(address indexed orderer, string indexed operationId);
 
-    event ApprovalToRequestPayout(address indexed walletToDebit, address indexed requester);
+    event ApprovalToOrderPayout(address indexed walletToDebit, address indexed orderer);
 
-    event RevokeApprovalToRequestPayout(address indexed walletToDebit, address indexed requester);
+    event RevokeApprovalToOrderPayout(address indexed walletToDebit, address indexed orderer);
+
 
     /**
      * @notice This function allows wallet owners to approve other addresses to request payouts on their behalf
@@ -30,13 +31,13 @@ interface IPayoutable {
      * as a "yes or no" flag
      * @param requester The address to be approved as potential issuer of payout requests
      */
-    function approveToRequestPayout(address requester) external returns (bool);
+    function approveToOrderPayout(address orderer) external returns (bool);
 
     /**
      * @notice This function allows wallet owners to revoke payout request privileges from previously approved addresses
      * @param requester The address to be revoked as potential issuer of payout requests
      */
-    function revokeApprovalToRequestPayout(address requester) external returns (bool);
+    function revokeApprovalToOrderPayout(address orderer) external returns (bool);
 
     /**
      * @notice Method for a wallet owner to request payout from the tokenizer on his/her own behalf
@@ -46,8 +47,8 @@ interface IPayoutable {
      * in an external repository), or a code to indicate that the tokenization entity should use the default
      * bank account associated with the wallet
      */
-    function requestPayout(
-        string calldata transactionId,
+    function orderPayout(
+        string calldata operationId,
         uint256 amount,
         string calldata instructions
     )
@@ -61,8 +62,8 @@ interface IPayoutable {
      * @param amount The amount requested
      * @param instructions The debit instructions, as is "requestPayout"
      */
-    function requestPayoutFrom(
-        string calldata transactionId,
+    function orderPayoutFrom(
+        string calldata operationId,
         address walletToDebit,
         uint256 amount,
         string calldata instructions
@@ -76,7 +77,7 @@ interface IPayoutable {
      * the payout request (together with the address of the sender)
      * @dev Only the original requester can actually cancel an outstanding request
      */
-    function cancelPayoutRequest(string calldata transactionId) external returns (bool);
+    function cancelPayout(string calldata operationId) external returns (bool);
 
     /**
      * @notice Function to be called by the tokenizer administrator to start processing a payout request. First of all
@@ -93,7 +94,9 @@ interface IPayoutable {
      * @dev Only operator can do this
      * 
      */
-    function processPayoutRequest(address requester, string calldata transactionId) external returns (bool);
+    function processPayout(address orderer, string calldata operationId) external returns (bool);
+
+    function executeHoldInPayout(address orderer, string calldata operationId) external returns (bool);
 
     /**
      * @notice Function to be called by the tokenizer administrator to honor a payout request. After crediting the
@@ -106,7 +109,7 @@ interface IPayoutable {
      * @dev The payout request needs to be InProcess in order to be able to be executed
      * 
      */
-    function executePayoutRequest(address requester, string calldata transactionId) external returns (bool);
+    function executePayout(address orderer, string calldata operationId) external returns (bool);
  
     /**
      * @notice Function to be called by the tokenizer administrator to reject a payout request
@@ -117,7 +120,7 @@ interface IPayoutable {
      * @dev Only operator can do this
      * 
      */
-    function rejectPayoutRequest(address requester, string calldata transactionId, string calldata reason) external returns (bool);
+    function rejectPayout(address orderer, string calldata operationId, string calldata reason) external returns (bool);
     
     /**
      * @notice View method to read existing allowances to request payout
@@ -125,7 +128,7 @@ interface IPayoutable {
      * @param requester The address that can request payout on behalf of the wallet owner
      * @return Whether the address is approved or not to request payout on behalf of the wallet owner
      */
-    function isApprovedToRequestPayout(address walletToDebit, address requester) external view returns (bool);
+    function isApprovedToOrderPayout(address walletToDebit, address orderer) external view returns (bool);
 
     /**
      * @notice Function to retrieve all the information available for a particular payout request
@@ -137,15 +140,15 @@ interface IPayoutable {
      * @return status: the current status of the payout request
      */
     function retrievePayoutData(
-        address requester,
-        string calldata transactionId
+        address orderer,
+        string calldata operationId
     )
         external view
         returns (
             address walletToDebit,
             uint256 amount,
             string memory instructions,
-            PayoutRequestStatusCode status
+            PayoutStatusCode status
         );
 
 }

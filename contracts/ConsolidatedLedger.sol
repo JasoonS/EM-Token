@@ -4,7 +4,6 @@ import "./interface/ICOnsolidatedLedger.sol";
 import "./ERC20Ledger.sol";
 import "./HoldsLedger.sol";
 import "./OverdraftsLedger.sol";
-import "./libraries/SafeMath.sol";
 
 /**
  * @title ConsolidatedLedger

@@ -1,7 +1,6 @@
 pragma solidity ^0.5;
 
 import "./EternalStorageConnector.sol";
-import "./libraries/SafeMath.sol";
 
 /**
  * @title ERC20Ledger - basic ledger functions and data
@@ -83,19 +82,19 @@ contract ERC20Ledger is EternalStorageConnector {
     // Private functions
 
     function _getBalance(address owner) private view returns (uint256) {
-        return _eternalStorage.getUintFromMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner);
+        return _eternalStorage.getUintFromAddressMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner);
     }
 
     function _setBalance(address owner, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner, value);
+        return _eternalStorage.setUintInAddressMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner, value);
     }
 
     function _getAllowance(address owner, address spender) private view returns (uint256) {
-        return _eternalStorage.getUintFromDoubleMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender);
+        return _eternalStorage.getUintFromDoubleAddressAddressMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender);
     }
 
     function _setAllowance(address owner, address spender, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInDoubleMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender, value);
+        return _eternalStorage.setUintInDoubleAddressAddressMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender, value);
     }
 
     function _getTotalSupply() private view returns (uint256) {

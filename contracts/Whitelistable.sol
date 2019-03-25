@@ -110,7 +110,7 @@ contract Whitelistable is RoleControl {
         require(!_isWhitelisted(who), "Address is already whitelisted");
         _eternalStorage.pushAddressToArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, who);
         index = _getNumberOfWhitelistedWallets();
-        _eternalStorage.setUintInMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who, index);
+        _eternalStorage.setUintInAddressMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who, index);
     }
 
     function _deleteAddressFromWhitelist(address who) private returns (bool) {
@@ -118,7 +118,7 @@ contract Whitelistable is RoleControl {
         require(index > 0, "Address is not whitelisted");
         return
             _eternalStorage.deleteAddressFromArray(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_ARRAY, index) &&
-            _eternalStorage.deleteAddressFromMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
+            _eternalStorage.deleteAddressFromAddressMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
     }
 
     function _getWhitelistedAddress(uint256 index) private view returns (address) {
@@ -126,7 +126,7 @@ contract Whitelistable is RoleControl {
     }
 
     function _getWhitelistedIndex(address who) private view returns (uint256 index) {
-        index = _eternalStorage.getUintFromMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
+        index = _eternalStorage.getUintFromAddressMapping(WHITELISTABLE_CONTRACT_NAME, _WHITELIST_MAPPING, who);
     }
 
     function _getNumberOfWhitelistedWallets() private view returns (uint256) {

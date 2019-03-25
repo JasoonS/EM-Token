@@ -4,31 +4,31 @@ interface IHoldable {
 
     enum HoldStatusCode {
         Nonexistent,
-        Created,
+        Ordered,
         ExecutedByNotary,
         ExecutedByOperator,
         ReleasedByNotary,
         ReleasedByPayee,
         ReleasedByOperator,
-        ReleasedBySenderAfterExpiration
+        ReleasedOnExpiration
     }
 
     event HoldCreated(
-        address indexed issuer,
-        string  indexed transactionId,
+        address indexed holder,
+        string  indexed operationId,
         address from,
         address to,
         address indexed notary,
         uint256 amount,
         bool    expires,
         uint256 expiration
-    ); // By issuer (which can be the payer as well)
+    ); // By holder (which can be the payer as well)
 
-    event HoldExecuted(address indexed issuer, string indexed transactionId, HoldStatusCode status); // By notary or by operator
+    event HoldExecuted(address indexed holder, string indexed operationId, HoldStatusCode status); // By notary or by operator
 
-    event HoldReleased(address indexed issuer, string indexed transactionId, HoldStatusCode status); // By issuer), by notary, or due to expiration
+    event HoldReleased(address indexed holder, string indexed operationId, HoldStatusCode status); // By notary, by payee, by operator, or due to expiration
 
-    event HoldRenewed(address indexed issuer, string indexed transactionId, uint256 oldExpiration, uint256 newExpiration); // By issuer
+    event HoldRenewed(address indexed holder, string indexed operationId, uint256 oldExpiration, uint256 newExpiration); // By holder
 
     /**
      * @notice This function allows wallet owners to approve other addresses to perform holds on their behalf
@@ -59,11 +59,11 @@ interface IHoldable {
      * establish the expiration time for the hold. After the expiration time anyone can actually trigger the release of the hold
      */
     function hold(
-        string  calldata transactionId,
+        string calldata operationId,
         address to,
         address notary,
         uint256 amount,
-        bool    expires,
+        bool expires,
         uint256 timeToExpiration
     )
         external
@@ -85,12 +85,12 @@ interface IHoldable {
      * establish the expiration time for the hold. After the expiration time anyone can actually trigger the release of the hold
      */
     function holdFrom(
-        string  calldata transactionId,
+        string calldata operationId,
         address from,
         address to,
         address notary,
         uint256 amount,
-        bool    expires,
+        bool expires,
         uint256 timeToExpiration
     )
         external
@@ -103,7 +103,7 @@ interface IHoldable {
      * @dev issuer and transactionId are needed to index a hold. This is provided so different issuers can use the same transactionId,
      * as holding is a competitive resource
      */
-    function releaseHold(address issuer, string calldata transactionId) external returns (bool);
+    function releaseHold(address holder, string calldata operationId) external returns (bool);
     
     /**
      * @notice Function to execute a hold (if at all possible)
@@ -113,7 +113,7 @@ interface IHoldable {
      * as holding is a competitive resource
      * @dev Holds that are expired can still be executed by the notary or the operator (as well as released by anyone)
      */
-    function executeHold(address issuer, string calldata transactionId) external returns (bool);
+    function executeHold(address holder, string calldata operationId) external returns (bool);
 
     /**
      * @notice Function to renew a hold (added time from now)
@@ -121,7 +121,7 @@ interface IHoldable {
      * @dev Only the issuer can renew a hold
      * @dev Non closed holds can be renewed, including holds that are already expired
      */
-    function renewHold(string calldata transactionId, uint256 timeToExpirationFromNow) external returns (bool);
+    function renewHold(string calldata operationId, uint256 timeToExpirationFromNow) external returns (bool);
 
     /**
      * @notice Returns whether an address is approved to submit holds on behalf of other wallets
@@ -146,14 +146,14 @@ interface IHoldable {
      * @dev issuer and transactionId are needed to index a hold. This is provided so different issuers can use the same transactionId,
      * as holding is a competitive resource
      */
-    function retrieveHoldData(address issuer, string calldata transactionId)
+    function retrieveHoldData(address holder, string calldata operationId)
         external view
         returns (
             address from,
             address to,
             address notary,
             uint256 amount,
-            bool    expires,
+            bool expires,
             uint256 expiration,
             HoldStatusCode status
         );
