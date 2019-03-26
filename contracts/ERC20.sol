@@ -21,7 +21,7 @@ contract ERC20 is IERC20, Compliant {
     * @param value The amount to be transferred.
     */
     function transfer(address to, uint256 value) external returns (bool) {
-        _check(_checkTransfer, msg.sender, to, value);
+        _check(_canTransfer, msg.sender, to, value);
         return _transfer(msg.sender, to, value);
     }
 
@@ -35,7 +35,7 @@ contract ERC20 is IERC20, Compliant {
      * @param value The amount of tokens to be spent.
      */
     function approve(address spender, uint256 value) external returns (bool) {
-        _check(_checkApprove, msg.sender, spender, value);
+        _check(_canApprove, msg.sender, spender, value);
         _approve(msg.sender, spender, value);
         emit Approval(msg.sender, spender, value);
         return true;
@@ -50,7 +50,7 @@ contract ERC20 is IERC20, Compliant {
      * @param value uint256 the amount of tokens to be transferred
      */
     function transferFrom(address from, address to, uint256 value) external returns (bool) {
-        _check(_checkTransfer, from, to, value);
+        _check(_canTransfer, from, to, value);
         uint256 newApproval = _allowance(from, msg.sender).sub(value);
         _approve(from, msg.sender, newApproval);
         emit Approval(from, msg.sender, newApproval);
@@ -66,7 +66,7 @@ contract ERC20 is IERC20, Compliant {
      */
     function increaseApproval(address spender, uint256 value) external returns (bool) {
         uint256 newApproval = _allowance(msg.sender, spender).add(value);
-        _check(_checkApprove, msg.sender, spender, newApproval);
+        _check(_canApprove, msg.sender, spender, newApproval);
         _approve(msg.sender, spender, newApproval);
         emit Approval(msg.sender, spender, newApproval);
         return true;
@@ -79,7 +79,7 @@ contract ERC20 is IERC20, Compliant {
      */
     function decreaseApproval(address spender, uint256 value) external returns (bool) {
         uint256 newApproval = _allowance(msg.sender, spender).sub(value);
-        _check(_checkApprove, msg.sender, spender, newApproval);
+        _check(_canApprove, msg.sender, spender, newApproval);
         _approve(msg.sender, spender, newApproval);
         emit Approval(msg.sender, spender, newApproval);
         return true;

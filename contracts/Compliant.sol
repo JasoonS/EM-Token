@@ -16,77 +16,79 @@ import "./Whitelistable.sol";
 contract Compliant is ICompliant, ConsolidatedLedger, Whitelistable {
 
     uint256 constant MAX_VALUE = 2**256 - 1;
+    byte constant FAILURE = 0x00;
+    byte constant SUCCESS = 0x01;
 
     // External functions
 
     // ERC20
     
-    function checkTransfer(address from, address to, uint256 value) external view
-        returns (bool canDo, string memory reason)
+    function canTransfer(address from, address to, uint256 value) external view
+        returns (byte status)
     {
-        return _checkTransfer(from, to, value);
+        return _canTransfer(from, to, value);
     }
 
-    function checkApprove(address owner, address spender, uint256 value) external view
-        returns (bool canDo, string memory reason)
+    function canApprove(address owner, address spender, uint256 value) external view
+        returns (byte status)
     {
-        return _checkApprove(owner, spender, value);
+        return _canApprove(owner, spender, value);
     }
 
     // Holdable
 
-    function checkHold(address from, address to, address notary, uint256 value) external view
-        returns (bool canDo, string memory reason)
+    function canHold(address from, address to, address notary, uint256 value) external view
+        returns (byte status)
     {
-        return _checkHold(from, to, notary, value);
+        return _canHold(from, to, notary, value);
     }
 
-    function checkApproveToHold(address payer, address holder) external view
-        returns (bool canDo, string memory reason)
+    function canApproveToHold(address payer, address holder) external view
+        returns (byte status)
     {
-        return _checkApproveToHold(payer, holder);
+        return _canApproveToHold(payer, holder);
     }
 
     // Clearable
     
-    function checkApproveToOrderClearedTransfer(address fromWallet, address requester) external view
-        returns (bool canDo, string memory reason)
+    function canApproveToOrderClearableTransfer(address fromWallet, address requester) external view
+        returns (byte status)
     {
-        return _checkApproveToOrderClearedTransfer(fromWallet, requester);
+        return _canApproveToOrderClearableTransfer(fromWallet, requester);
     }
 
-    function checkOrderClearedTransfer(address from, address to, uint256 value) external view
-        returns (bool canDo, string memory reason)
+    function canOrderClearableTransfer(address from, address to, uint256 value) external view
+        returns (byte status)
     {
-        return _checkOrderClearedTransfer(from, to, value);
+        return _canOrderClearableTransfer(from, to, value);
     }
 
     // Fundable
     
-    function checkApproveToRequestFunding(address walletToFund, address requester) external view
-        returns (bool canDo, string memory reason)
+    function canApproveToOrderFunding(address walletToFund, address requester) external view
+        returns (byte status)
     {
-        return _checkApproveToRequestFunding(walletToFund, requester);
+        return _canApproveToOrderFunding(walletToFund, requester);
     }
 
-    function checkRequestFunding(address walletToFund, address requester, uint256 value) external view
-        returns (bool canDo, string memory reason)
+    function canOrderFunding(address walletToFund, address requester, uint256 value) external view
+        returns (byte status)
     {
-        return _checkRequestFunding(walletToFund, requester, value);
+        return _canOrderFunding(walletToFund, requester, value);
     }
 
     // Payoutable
     
-    function checkApproveToRequestPayout(address walletToDebit, address requester) external view
-        returns (bool canDo, string memory reason)
+    function canApproveToOrderPayout(address walletToDebit, address requester) external view
+        returns (byte status)
     {
-        return _checkApproveToRequestPayout(walletToDebit, requester);
+        return _canApproveToOrderPayout(walletToDebit, requester);
     }
 
-    function checkRequestPayout(address walletToDebit, address requester, uint256 value) external view
-        returns (bool canDo, string memory reason)
+    function canOrderPayout(address walletToDebit, address requester, uint256 value) external view
+        returns (byte status)
     {
-        return _checkRequestPayout(walletToDebit, requester, value);
+        return _canOrderPayout(walletToDebit, requester, value);
     }
 
 
@@ -94,145 +96,111 @@ contract Compliant is ICompliant, ConsolidatedLedger, Whitelistable {
 
     // ERC20
     
-    function _checkTransfer(address from, address to, uint256 value) internal view
-        returns (bool canDo, string memory reason)
+    function _canTransfer(address from, address to, uint256 value) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(from)) {
-            reason = "Sender is not whitelisted";
-        } else if(!_isWhitelisted(to)) {
-            reason = "Receiver is not whitelisted";
-        } else if(value > MAX_VALUE) {
-            reason = "Amount too big";
+        if(!_isWhitelisted(from) || !_isWhitelisted(to) || value > MAX_VALUE) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
-    function _checkApprove(address allower, address spender, uint256 value) internal view
-        returns (bool canDo, string memory reason)
+    function _canApprove(address allower, address spender, uint256 value) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(allower)) {
-            reason = "Allower is not whitelisted";
-        } else if(!_isWhitelisted(spender)) {
-            reason = "Spender is not whitelisted";
-        } else if(value > MAX_VALUE) {
-            reason = "Amount too big";
+        if(!_isWhitelisted(allower) || !_isWhitelisted(spender) || value > MAX_VALUE) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
     // Holdable
 
-    function _checkHold(address payer, address payee, address notary, uint256 value) internal view
-        returns (bool canDo, string memory reason)
+    function _canHold(address payer, address payee, address notary, uint256 value) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(payer)) {
-            reason = "Payer is not whitelisted";
-        } else if(!_isWhitelisted(payee)) {
-            reason = "Payee is not whitelisted";
-        } else if(notary != address(0) && !_isWhitelisted(notary)) {
-            reason = "Notary is not whitelisted";
-        } else if(value > MAX_VALUE) {
-            reason = "Amount too big";
+        if(!_isWhitelisted(payer) || !_isWhitelisted(payee) || (notary != address(0) && !_isWhitelisted(notary)) || value > MAX_VALUE) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
-    function _checkApproveToHold(address payer, address holder) internal view
-        returns (bool canDo, string memory reason)
+    function _canApproveToHold(address payer, address holder) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(payer)) {
-            reason = "Payer is not whitelisted";
-        } else if(!_isWhitelisted(holder)) {
-            reason = "Holder is not whitelisted";
+        if(!_isWhitelisted(payer) || !_isWhitelisted(holder)) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
     // Clearable
     
-    function _checkApproveToOrderClearedTransfer(address fromWallet, address requester) internal view
-        returns (bool canDo, string memory reason)
+    function _canApproveToOrderClearableTransfer(address fromWallet, address requester) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(fromWallet)) {
-            reason = "Wallet to debit not whitelisted";
-        } else if(!_isWhitelisted(requester)) {
-            reason = "Requester not whitelisted";
+        if(!_isWhitelisted(fromWallet) || !_isWhitelisted(requester)) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
-    function _checkOrderClearedTransfer(address fromWallet, address toWallet, uint256 value) internal view
-        returns (bool canDo, string memory reason)
+    function _canOrderClearableTransfer(address fromWallet, address toWallet, uint256 value) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(fromWallet)) {
-            reason = "Wallet to debit not whitelisted";
-        } else if(!_isWhitelisted(toWallet)) {
-            reason = "Requester not whitelisted";
-        } else if(value > MAX_VALUE) {
-            reason = "Amount too big";
+        if(!_isWhitelisted(fromWallet) || !_isWhitelisted(toWallet) || value > MAX_VALUE) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
     // Fundable
     
-    function _checkApproveToRequestFunding(address walletToFund, address requester) internal view
-        returns (bool canDo, string memory reason)
+    function _canApproveToOrderFunding(address walletToFund, address requester) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(walletToFund)) {
-            reason = "Wallet to fund not whitelisted";
-        } else if(!_isWhitelisted(requester)) {
-            reason = "Requester not whitelisted";
+        if(!_isWhitelisted(walletToFund) || !_isWhitelisted(requester)) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
-    function _checkRequestFunding(address walletToFund, address requester, uint256 value) internal view
-        returns (bool canDo, string memory reason)
+    function _canOrderFunding(address walletToFund, address requester, uint256 value) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(walletToFund)) {
-            reason = "Wallet to fund not whitelisted";
-        } else if(!_isWhitelisted(requester)) {
-            reason = "Requester not whitelisted";
-        } else if(value > MAX_VALUE) {
-            reason = "Amount too big";
+        if(!_isWhitelisted(walletToFund) || !_isWhitelisted(requester) || value > MAX_VALUE) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
     // Payoutable
     
-    function _checkApproveToRequestPayout(address walletToDebit, address requester) internal view
-        returns (bool canDo, string memory reason)
+    function _canApproveToOrderPayout(address walletToDebit, address requester) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(walletToDebit)) {
-            reason = "Wallet to debit not whitelisted";
-        } else if(!_isWhitelisted(requester)) {
-            reason = "Requester not whitelisted";
+        if(!_isWhitelisted(walletToDebit) || !_isWhitelisted(requester)) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
-    function _checkRequestPayout(address walletToDebit, address requester, uint256 value) internal view
-        returns (bool canDo, string memory reason)
+    function _canOrderPayout(address walletToDebit, address requester, uint256 value) internal view
+        returns (byte status)
     {
-        if(!_isWhitelisted(walletToDebit)) {
-            reason = "Wallet to debit not whitelisted";
-        } else if(!_isWhitelisted(requester)) {
-            reason = "Requester not whitelisted";
-        } else if(value > MAX_VALUE) {
-            reason = "Amount too big";
+        if(!_isWhitelisted(walletToDebit) || !_isWhitelisted(requester) || value > MAX_VALUE) {
+            return FAILURE;
         } else {
-            canDo = true;
+            return SUCCESS;
         }
     }
 
@@ -243,7 +211,7 @@ contract Compliant is ICompliant, ConsolidatedLedger, Whitelistable {
     }
 
     function _check(
-        function(address, address, address, uint256) returns (bool, string memory) checkFunction,
+        function(address, address, address, uint256) returns (byte) checkFunction,
         address a,
         address b,
         address c,
@@ -251,38 +219,30 @@ contract Compliant is ICompliant, ConsolidatedLedger, Whitelistable {
     )
         internal
     {
-        bool test;
-        string memory reason;
-        (test, reason) = checkFunction(a, b, c, d);
-        require(test, reason);
+        byte status = checkFunction(a, b, c, d);
+        require(status == SUCCESS, "Compliance check failed");
     }
 
     function _check(
-        function(address, address, uint256) returns (bool, string memory) checkFunction,
+        function(address, address, uint256) returns (byte) checkFunction,
         address a,
         address b,
         uint256 c
     )
         internal
     {
-        bool test;
-        string memory reason;
-        (test, reason) = checkFunction(a, b, c);
-        require(test, reason);
+        byte status = checkFunction(a, b, c);
+        require(status == SUCCESS, "Compliance check failed");
     }
 
-    function _check(function(address, address) returns (bool, string memory) checkFunction, address a, address b) internal {
-        bool test;
-        string memory reason;
-        (test, reason) = checkFunction(a, b);
-        require(test, reason);
+    function _check(function(address, address) returns (byte) checkFunction, address a, address b) internal {
+        byte status = checkFunction(a, b);
+        require(status == SUCCESS, "Compliance check failed");
     }
 
-    function _check(function(address) returns (bool, string memory) checkFunction, address a) internal {
-        bool test;
-        string memory reason;
-        (test, reason) = checkFunction(a);
-        require(test, reason);
+    function _check(function(address) returns (byte) checkFunction, address a) internal {
+        byte status = checkFunction(a);
+        require(status == SUCCESS, "Compliance check failed");
     }
 
 }

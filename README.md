@@ -352,7 +352,7 @@ function orderPayout(string calldata operationId, uint256 amount, string calldat
 function orderPayoutFrom(string calldata operationId, address walletToDebit, uint256 amount, string calldata instructions) external returns (bool);
 function cancelPayout(string calldata operationId) external returns (bool);
 function processPayout(address orderer, string calldata operationId) external returns (bool);
-function executeHoldInPayout(address orderer, string calldata operationId) external returns (bool);
+function putFundsInSuspenseInPayout(address orderer, string calldata operationId) external returns (bool);
 function executePayout(address orderer, string calldata operationId) external returns (bool);
 function rejectPayout(address orderer, string calldata operationId, string calldata reason) external returns (bool);
 ```
@@ -369,6 +369,7 @@ Events are to be sent on relevant transactions:
 ```
 event PayoutOrdered(address indexed orderer, string indexed operationId, address indexed walletToDebit, uint256 amount, string instructions);
 event PayoutInProcess(address indexed orderer, string indexed operationId);
+event PayoutFundsInSuspense(address indexed orderer, string indexed operationId);
 event PayoutExecuted(address indexed orderer, string indexed operationId);
 event PayoutRejected(address indexed orderer, string indexed operationId, string reason);
 event PayoutCancelled(address indexed orderer, string indexed operationId);

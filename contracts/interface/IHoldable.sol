@@ -48,8 +48,8 @@ interface IHoldable {
      * @notice Function to perform a hold on behalf of a wallet owner (the payer, who is the sender of the transaction) in
      * favor of another wallet owner (the payee), and specifying a notary who will be responsable to either execute or
      * release the transfer
-     * @param transactionId An unique ID to identify the hold. Internally IDs will be stored together with the addresses
-     * issuing the holds (on a mapping (address => mapping (string => XXX ))), so the same transactionId can be used by many
+     * @param operationId An unique ID to identify the hold. Internally IDs will be stored together with the addresses
+     * issuing the holds (on a mapping (address => mapping (string => XXX ))), so the same operationId can be used by many
      * different holders. This is provided assuming that the hold functionality is a competitive resource
      * @param to The address of the payee, to which the tokens are to be paid (if the hold is executed)
      * @param notary The address of the notary who is going to determine whether the hold is to be executed or released
@@ -73,8 +73,8 @@ interface IHoldable {
      * @notice Function to perform a hold on behalf of a wallet owner (the payer, entered in the "from" address) in favor of
      * another wallet owner (the payee, entered in the "to" address), and specifying a notary who will be responsable to either
      * execute or release the transfer
-     * @param transactionId An unique ID to identify the hold. Internally IDs will be stored together with the addresses
-     * issuing the holds (on a mapping (address => mapping (string => XXX ))), so the same transactionId can be used by many
+     * @param operationId An unique ID to identify the hold. Internally IDs will be stored together with the addresses
+     * issuing the holds (on a mapping (address => mapping (string => XXX ))), so the same operationId can be used by many
      * different holders. This is provided assuming that the hold functionality is a competitive resource
      * @param from The address of the payer, from which the tokens are to be taken (if the hold is executed)
      * @param to The address of the payee, to which the tokens are to be paid (if the hold is executed)
@@ -98,18 +98,18 @@ interface IHoldable {
 
     /**
      * @notice Function to release a hold (if at all possible)
-     * @param issuer The address of the original sender of the hold
-     * @param transactionId The ID of the hold in question
-     * @dev issuer and transactionId are needed to index a hold. This is provided so different issuers can use the same transactionId,
+     * @param holder The address of the original sender of the hold
+     * @param operationId The ID of the hold in question
+     * @dev holder and operationId are needed to index a hold. This is provided so different holders can use the same operationId,
      * as holding is a competitive resource
      */
     function releaseHold(address holder, string calldata operationId) external returns (bool);
     
     /**
      * @notice Function to execute a hold (if at all possible)
-     * @param issuer The address of the original sender of the hold
-     * @param transactionId The ID of the hold in question
-     * @dev issuer and transactionId are needed to index a hold. This is provided so different issuers can use the same transactionId,
+     * @param holder The address of the original sender of the hold
+     * @param operationId The ID of the hold in question
+     * @dev issuer and transactionId are needed to index a hold. This is provided so different holders can use the same operationId,
      * as holding is a competitive resource
      * @dev Holds that are expired can still be executed by the notary or the operator (as well as released by anyone)
      */
@@ -117,8 +117,8 @@ interface IHoldable {
 
     /**
      * @notice Function to renew a hold (added time from now)
-     * @param transactionId The ID of the hold in question
-     * @dev Only the issuer can renew a hold
+     * @param operationId The ID of the hold in question
+     * @dev Only the holder can renew a hold
      * @dev Non closed holds can be renewed, including holds that are already expired
      */
     function renewHold(string calldata operationId, uint256 timeToExpirationFromNow) external returns (bool);
@@ -133,8 +133,8 @@ interface IHoldable {
 
     /**
      * @notice Function to retrieve all the information available for a particular hold
-     * @param issuer The address of the original sender of the hold
-     * @param transactionId The ID of the hold in question
+     * @param holder The address of the original sender of the hold
+     * @param operationId The ID of the hold in question
      * @return from: the wallet from which the tokens will be taken if the hold is executed
      * @return to: the wallet to which the tokens will be transferred if the hold is executed
      * @return notary: the address that will be executing or releasing the hold
@@ -143,7 +143,7 @@ interface IHoldable {
      * @return expiration: (only relevant in case expires==true) the absolute time (block.timestamp) by which the hold will
      * expire (after that time the hold can be released by anyone)
      * @return status: the current status of the hold
-     * @dev issuer and transactionId are needed to index a hold. This is provided so different issuers can use the same transactionId,
+     * @dev holder and operationId are needed to index a hold. This is provided so different holders can use the same operationId,
      * as holding is a competitive resource
      */
     function retrieveHoldData(address holder, string calldata operationId)

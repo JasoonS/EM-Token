@@ -21,24 +21,24 @@ interface IClearable {
 
 
     /**
-     * @notice This function allows wallet owners to approve other addresses to request cleared transfers on their behalf
+     * @notice This function allows wallet owners to approve other addresses to order clearable transfers on their behalf
      * @dev It is similar to the "approve" method in ERC20, but in this case no allowance is given and this is treated
      * as a "yes or no" flag
-     * @param requester The address to be approved as potential issuer of cleared transfer requests
+     * @param orderer The address to be approved as potential orderer of clearable transfers
      */
     function approveToOrderClearableTransfer(address orderer) external returns (bool);
 
     /**
-     * @notice This function allows wallet owners to revoke cleared transfer request privileges from previously approved
+     * @notice This function allows wallet owners to revoke clearable transfer ordering privileges from previously approved
      * addresses
-     * @param requester The address to be revoked as potential issuer of cleared transfer requests
+     * @param orderer The address to be revoked as potential orderer of clearable transfers
      */
     function revokeApprovalToOrderClearableTransfer(address orderer) external returns (bool);
 
     /**
-     * @notice Method for a wallet owner to request cleared transfer from the tokenizer on his/her own behalf
-     * @param transactionId The ID of the cleared transfer request, which can then be used to index all the information about
-     * the cleared transfer request (together with the address of the sender)
+     * @notice Method for a wallet owner to order a clearable transfer from the tokenizer on his/her own behalf
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     * the clearable transfer (together with the address of the sender)
      * @param to The wallet to which the transfer is directed to
      * @param amount The amount to be transferred
      */
@@ -51,10 +51,10 @@ interface IClearable {
         returns (bool);
     
     /**
-     * @notice Method to request cleared transfer on behalf of a (different) wallet owner (analogous to "transferFrom" in
-     * classical ERC20). The requester needs to be previously approved
-     * @param transactionId The ID of the cleared transfer request, which can then be used to index all the information about
-     * the cleared transfer request (together with the address of the sender)
+     * @notice Method to order a clearable transfer on behalf of a (different) wallet owner (analogous to "transferFrom" in
+     * classical ERC20). The orderer needs to be previously approved
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     * the clearable transfer (together with the address of the sender)
      * @param from The wallet the funds will be transferred from
      * @param to The wallet to which the transfer is directed to
      * @param amount The amount to be transferred
@@ -69,44 +69,43 @@ interface IClearable {
         returns (bool);
 
     /**
-     * @notice Function to cancel an outstanding (i.e. not processed) cleared transfer request
-     * @param transactionId The ID of the cleared transfer request, which can then be used to index all the information about
-     * the cleared transfer request (together with the address of the sender)
-     * @dev Only the original requester can actually cancel an outstanding request
+     * @notice Function to cancel an outstanding (i.e. not processed) clearable transfer
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     * the clearable transfer (together with the address of the sender)
+     * @dev Only the original orderer can actually cancel an outstanding clerable transfer
      */
     function cancelClearableTransfer(string calldata operationId) external returns (bool);
 
     /**
-     * @notice Function to be called by the tokenizer administrator to start processing a cleared transfer request. It simply
-     * sets the status to "InProcess", which then prevents the requester from being able to cancel the payout
-     * request. This method can be called by the operator to "lock" the cleared transfer request while the internal
-     * transfers etc are done by the bank (offchain). It is not required though to call this method before
-     * actually executing or rejecting the request, since the operator can call the executeClearedTransferRequest or the
-     * rejectClearedTransferRequest directly, if desired.
-     * @param requester The requester of the cleared transfer request
-     * @param transactionId The ID of the cleared transfer request, which can then be used to index all the information about
-     * the cleared transfer request (together with the address of the sender)
+     * @notice Function to be called by the tokenizer administrator to start processing a clearable transfer. It simply
+     * sets the status to "InProcess", which then prevents the orderer from being able to cancel the transfer. This method
+     * can be called by the operator to "lock" the clearable transfer while the internal transfers etc are done by the bank
+     * (offchain). It is not required though to call this method before actually executing or rejecting the request, since
+     * the operator can call the executeClearableTransfer or the rejectClearableTransfer directly, if desired.
+     * @param orderer The orderer of the clearable transfer
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     * the clearable transfer (together with the address of the sender)
      * @dev Only an operator can do this
      * 
      */
     function processClearableTransfer(address orderer, string calldata operationId) external returns (bool);
 
     /**
-     * @notice Function to be called by the tokenizer administrator to honor a cleared transfer request. This will execute
-     * the hold and thus transfer the tokens from from to to
-     * @param requester The requester of the cleared transfer request
-     * @param transactionId The ID of the cleared transfer request, which can then be used to index all the information about
-     * the cleared transfer request (together with the address of the sender)
+     * @notice Function to be called by the tokenizer administrator to honor a clearable transfer. This will execute
+     * the hold and thus transfer the tokens from the payer to the payee
+     * @param orderer The orderer of the clearable transfer
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     * the clearable transfer (together with the address of the sender)
      * @dev Only operator can do this
      * 
      */
     function executeClearableTransfer(address orderer, string calldata operationId) external returns (bool);
 
     /**
-     * @notice Function to be called by the tokenizer administrator to reject a cleared transfer request
-     * @param requester The requester of the cleared transfer request
-     * @param transactionId The ID of the cleared transfer request, which can then be used to index all the information about
-     * the cleared transfer request (together with the address of the sender)
+     * @notice Function to be called by the tokenizer administrator to reject a clearable transfer
+     * @param orderer The orderer of the clearable transfer
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     * the clearable transfer (together with the address of the sender)
      * @param reason A string field to provide a reason for the rejection, should this be necessary
      * @dev Only operator can do this
      * 
@@ -116,21 +115,21 @@ interface IClearable {
     // External view functions
     
     /**
-     * @notice View method to read existing allowances to request payout
-     * @param toDebit The address of the wallet from which the funds will be taken
-     * @param requester The address that can request cleared transfer on behalf of the wallet owner
-     * @return Whether the address is approved or not to request cleared transfer on behalf of the wallet owner
+     * @notice View method to read existing allowances to payout
+     * @param wallet The address of the wallet from which the funds will be taken
+     * @param orderer The address that can order clearable transfer on behalf of the wallet owner
+     * @return Whether the address is approved or not to order clearable transfer on behalf of the wallet owner
      */
     function isApprovedToOrderClearableTransfer(address wallet, address orderer) external view returns (bool);
 
     /**
-     * @notice Function to retrieve all the information available for a particular cleared transfer request
-     * @param requester The requester of the cleared transfer request
-     * @param transactionId The ID of the cleared transfer request
+     * @notice Function to retrieve all the information available for a particular clearable transfer
+     * @param orderer The orderer of the clearable transfer
+     * @param operationId The ID of the clearable transfer
      * @return from: The address of the wallet from which the funds will be transferred
      * @return to: The address of the wallet that will receive the funds
      * @return amount: the amount of funds requested
-     * @return status: the current status of the cleared transfer request
+     * @return status: the current status of the clearable transfer
      */
     function retrieveClearableTransferData(
         address orderer,

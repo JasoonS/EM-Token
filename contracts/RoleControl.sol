@@ -2,7 +2,7 @@ pragma solidity ^0.5;
 
 import "./libraries/Roles.sol";
 import "./libraries/Strings.sol";
-import "./EternalStorageConnector.sol";
+import "../../EternalStorage/contracts/EternalStorageConnector.sol";
 
 /**
  * @title RoleControl

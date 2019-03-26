@@ -1,6 +1,6 @@
 pragma solidity ^0.5;
 
-import "./EternalStorageConnector.sol";
+import "../../EternalStorage/contracts/EternalStorageConnector.sol";
 
 contract HoldsLedger is EternalStorageConnector {
 
@@ -13,7 +13,7 @@ contract HoldsLedger is EternalStorageConnector {
     /**
      * @dev Data structures (implemented in the eternal storage):
      * @dev _HOLD_IDS : string array with hold IDs
-     * @dev _HOLD_ISSUERS : address array with the issuers of the holds ("holders")
+     * @dev _HOLD_HOLDERS : address array with the issuers of the holds ("holders")
      * @dev _HOLD_FROMS : address array with the payers of the holds
      * @dev _HOLD_TOS : address array with the payees of the holds
      * @dev _HOLD_NOTARIES : address array with the notaries of the holds
@@ -22,12 +22,12 @@ contract HoldsLedger is EternalStorageConnector {
      * @dev _HOLD_EXPIRATIONS : uint256 array with the expirations of the holds
      * @dev _HOLD_STATUS_CODES : uint256 array with the status codes of the holds
      * @dev _HOLD_IDS_INDEXES : mapping (address => string => uint256) with the indexes for hold data
-     * (this is to allow equal IDs to be used by different requesters)
+     * (this is to allow equal IDs to be used by different holders)
      * @dev _BALANCES_ON_HOLD : mapping (address => uint256) with the total amounts on hold for each wallet
      * @dev _TOTAL_SUPPLY_ON_HOLD : Uint with the total amount on hold in the system
      */
     bytes32 constant private _HOLD_IDS =             "_holdIds";
-    bytes32 constant private _HOLD_ISSUERS =         "_holdIssuers";
+    bytes32 constant private _HOLD_HOLDERS =         "_holdHolders";
     bytes32 constant private _HOLD_FROMS =           "_holdFroms";
     bytes32 constant private _HOLD_TOS =             "_holdTos";
     bytes32 constant private _HOLD_NOTARIES =        "_holdNotaries";
@@ -46,26 +46,26 @@ contract HoldsLedger is EternalStorageConnector {
         _;
     }
 
-    modifier holdExists(address issuer, string memory transactionId) {
-        require (_getHoldIndex(issuer, transactionId) > 0, "Hold does not exist");
+    modifier holdExists(address holder, string memory operationId) {
+        require (_getHoldIndex(holder, operationId) > 0, "Hold does not exist");
         _;
     }
 
-    modifier holdDoesNotExist(address issuer, string memory transactionId) {
-        require (_getHoldIndex(issuer, transactionId) == 0, "Hold exists");
+    modifier holdDoesNotExist(address holder, string memory operationId) {
+        require (_getHoldIndex(holder, operationId) == 0, "Hold exists");
         _;
     }
 
-    modifier holdWithStatus(address issuer, string memory transactionId, uint256 status) {
-        require (_getHoldStatus(_getHoldIndex(issuer, transactionId)) == status, "Hold with the wrong status");
+    modifier holdWithStatus(address holder, string memory operationId, uint256 status) {
+        require (_getHoldStatus(_getHoldIndex(holder, operationId)) == status, "Hold with the wrong status");
         _;
     }
 
     // Internal functions
 
     function _createHold(
-        address issuer,
-        string  memory transactionId,
+        address holder,
+        string  memory operationId,
         address from,
         address to,
         address notary,
@@ -77,12 +77,12 @@ contract HoldsLedger is EternalStorageConnector {
         internal
         returns (uint256 index)
     {
-        index = _pushNewHold(issuer, transactionId, from, to, notary, amount, expires, expiration, status);
+        index = _pushNewHold(holder, operationId, from, to, notary, amount, expires, expiration, status);
         _addBalanceOnHold(from, amount);
     }
 
-    function _finalizeHold(address issuer, string memory transactionId, uint256 status) internal returns (bool) {
-        uint256 index = _getHoldIndex(issuer, transactionId);
+    function _finalizeHold(address holder, string memory operationId, uint256 status) internal returns (bool) {
+        uint256 index = _getHoldIndex(holder, operationId);
         address from = _getHoldFrom(index);
         uint256 amount = _getHoldAmount(index);
         bool r1 = _substractBalanceOnHold(from, amount);
@@ -90,36 +90,36 @@ contract HoldsLedger is EternalStorageConnector {
         return r1 && r2;
     }
     
-    function _holdIndex(address issuer, string memory transactionId) internal view returns(uint index) {
-        return _getHoldIndex(issuer, transactionId);
+    function _holdIndex(address holder, string memory operationId) internal view returns(uint index) {
+        return _getHoldIndex(holder, operationId);
     }
 
-    function _holdFrom(address issuer, string memory transactionId) internal view returns(address from) {
-        return _getHoldFrom(_getHoldIndex(issuer, transactionId));
+    function _holdFrom(address holder, string memory operationId) internal view returns(address from) {
+        return _getHoldFrom(_getHoldIndex(holder, operationId));
     }
 
-    function _holdTo(address issuer, string memory transactionId) internal view returns(address to) {
-        return _getHoldTo(_getHoldIndex(issuer, transactionId));
+    function _holdTo(address holder, string memory operationId) internal view returns(address to) {
+        return _getHoldTo(_getHoldIndex(holder, operationId));
     }
 
-    function _holdNotary(address issuer, string memory transactionId) internal view returns(address notary) {
-        return _getHoldNotary(_getHoldIndex(issuer, transactionId));
+    function _holdNotary(address holder, string memory operationId) internal view returns(address notary) {
+        return _getHoldNotary(_getHoldIndex(holder, operationId));
     }
 
-    function _holdAmount(address issuer, string memory transactionId) internal view returns(uint256 amount) {
-        return _getHoldAmount(_getHoldIndex(issuer, transactionId));
+    function _holdAmount(address holder, string memory operationId) internal view returns(uint256 amount) {
+        return _getHoldAmount(_getHoldIndex(holder, operationId));
     }
 
-    function _holdExpires(address issuer, string memory transactionId) internal view returns(bool expires) {
-        return _getHoldExpires(_getHoldIndex(issuer, transactionId));
+    function _holdExpires(address holder, string memory operationId) internal view returns(bool expires) {
+        return _getHoldExpires(_getHoldIndex(holder, operationId));
     }
 
-    function _holdExpiration(address issuer, string memory transactionId) internal view returns(uint256 expiration) {
-        return _getHoldExpiration(_getHoldIndex(issuer, transactionId));
+    function _holdExpiration(address holder, string memory operationId) internal view returns(uint256 expiration) {
+        return _getHoldExpiration(_getHoldIndex(holder, operationId));
     }
 
-    function _holdStatus(address issuer, string memory transactionId) internal view returns (uint256 status) {
-        return _getHoldStatus(_getHoldIndex(issuer, transactionId));
+    function _holdStatus(address holder, string memory operationId) internal view returns (uint256 status) {
+        return _getHoldStatus(_getHoldIndex(holder, operationId));
     }
 
     function _manyHolds() internal view returns (uint256 many) {
@@ -134,12 +134,12 @@ contract HoldsLedger is EternalStorageConnector {
         return _getTotalSupplyOnHold();
     }
 
-    function _getHoldId(uint256 index) internal view returns (address issuer, string memory transactionId) {
-        return (_getHoldIssuer(index), _getHoldTransactionId(index));
+    function _getHoldId(uint256 index) internal view returns (address holder, string memory operationId) {
+        return (_getHoldHolder(index), _getHoldTransactionId(index));
     }
 
-    function _changeTimeToHold(address issuer, string memory transactionId, uint256 timeToExpirationFromNow) internal returns (bool) {
-        return _setHoldExpiration(_getHoldIndex(issuer, transactionId), block.timestamp.add(timeToExpirationFromNow));
+    function _changeTimeToHold(address holder, string memory operationId, uint256 timeToExpirationFromNow) internal returns (bool) {
+        return _setHoldExpiration(_getHoldIndex(holder, operationId), block.timestamp.add(timeToExpirationFromNow));
     }
 
     // Private functions
@@ -148,16 +148,16 @@ contract HoldsLedger is EternalStorageConnector {
         return _eternalStorage.getUintFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, 0);
     }
 
-    function _getHoldIndex(address issuer, string memory transactionId) private view holdExists(issuer, transactionId) returns (uint256) {
-        return _eternalStorage.getUintFromStringMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, transactionId);
+    function _getHoldIndex(address holder, string memory operationId) private view holdExists(holder, operationId) returns (uint256) {
+        return _eternalStorage.getUintFromStringMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, operationId);
     }
 
     function _getHoldTransactionId(uint256 index) private view holdIndexExists(index) returns (string memory) {
         return _eternalStorage.getStringFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, index);
     }
 
-    function _getHoldIssuer(uint256 index) private view holdIndexExists(index) returns (address) {
-        return _eternalStorage.getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_ISSUERS, index);
+    function _getHoldHolder(uint256 index) private view holdIndexExists(index) returns (address) {
+        return _eternalStorage.getAddressFromArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_HOLDERS, index);
     }
 
     function _getHoldFrom(uint256 index) private view holdIndexExists(index) returns (address) {
@@ -217,8 +217,8 @@ contract HoldsLedger is EternalStorageConnector {
     }
 
     function _pushNewHold(
-        address issuer,
-        string  memory transactionId,
+        address holder,
+        string  memory operationId,
         address from,
         address to,
         address notary,
@@ -228,11 +228,11 @@ contract HoldsLedger is EternalStorageConnector {
         uint256 status
     )
         internal
-        holdDoesNotExist(issuer, transactionId)
+        holdDoesNotExist(holder, operationId)
         returns (uint256)
     {
-        _eternalStorage.pushStringToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, transactionId);
-        _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_ISSUERS, issuer);
+        _eternalStorage.pushStringToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS, operationId);
+        _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_HOLDERS, holder);
         _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_FROMS, from);
         _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_TOS, to);
         _eternalStorage.pushAddressToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_NOTARIES, notary);
@@ -240,11 +240,11 @@ contract HoldsLedger is EternalStorageConnector {
         _eternalStorage.pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRATIONS, expiration);
         _eternalStorage.pushBoolToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_EXPIRES, expires);
         _eternalStorage.pushUintToArray(HOLDSLEDGER_CONTRACT_NAME, _HOLD_STATUS_CODES, status);
-        return _recordIndexInMapping(issuer, transactionId, _getManyHolds());
+        return _recordIndexInMapping(holder, operationId, _getManyHolds());
     }
 
-    function _recordIndexInMapping(address issuer, string memory transactionId, uint256 index) private returns (uint256){
-        _eternalStorage.setUintInDoubleAddressStringMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, issuer, transactionId, index);
+    function _recordIndexInMapping(address holder, string memory operationId, uint256 index) private returns (uint256){
+        _eternalStorage.setUintInDoubleAddressStringMapping(HOLDSLEDGER_CONTRACT_NAME, _HOLD_IDS_INDEXES, holder, operationId, index);
         return index;
     }
 

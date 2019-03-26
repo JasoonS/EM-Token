@@ -10,6 +10,19 @@ import "./Payoutable.sol";
 import "./libraries/Strings.sol";
 import "../../EternalStorage/contracts/EternalStorage.sol";
 
+/**
+ * @title EMoneyToken - a token that implements electronic money
+ * @notice The Electronic Money Token extends the ERC20 basic functionality with functionality needed to support banking and electronic
+ https://emoneystandardtoken.org, https://emoneystandardtoken.netlify.com/ and https://github.com/juliofaura/EM-Token/blob/master/README.md
+ * @dev The constructor of this contract takes 5 parameters. The first four (name, symbol, currency and decimals) are purely informational,
+ * but the fifth specifies the address of an eternal storage repository where to store the storage data of the contract. This is because the
+ * implementation uses the eternal storage construct implemented at https://github.com/juliofaura/EternalStorage, which allows to separate
+ * contract logic (in the EMoneyToken contract) from data storage (in a seàrate EternalStorage contract). The address of the eternal storage
+ * repository can be specified upon instantiation by passing a parameter to the constructor, in which case the rest of the parameters (name,
+ * symbol, currency and decimals) must match the ones stored in the eternal storage (otherwise an exception is thrown upon instantiation of
+ * the contract). If the eternal storage is not previously intialized then it will be initialized with the correct paramenters. And if a
+ * zero address is passed, then a new eternal storage is instantiated for this EMoneyToken contract.
+ */
 contract EMoneyToken is IEMoneyToken, ERC20, Holdable, Overdraftable, Clearable, Fundable, Payoutable {
 
     using Strings for string;
@@ -58,7 +71,7 @@ contract EMoneyToken is IEMoneyToken, ERC20, Holdable, Overdraftable, Clearable,
             _eternalStorage.setBool(EMONEYTOKEN_CONTRACT_NAME, _INITIALIZED, true);
             _whitelist(SUSPENSE_WALLET);
         }
-        emit Created(name, symbol, currency, decimals, _version, eternalStorage);
+        emit Created(name, symbol, currency, decimals, _version);
     }
 
     // External functions

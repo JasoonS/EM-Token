@@ -1,6 +1,6 @@
 pragma solidity ^0.5;
 
-import "./EternalStorageConnector.sol";
+import "../../EternalStorage/contracts/EternalStorageConnector.sol";
 
 /**
  * @title ERC20Ledger - basic ledger functions and data
