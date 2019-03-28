@@ -82,27 +82,27 @@ contract ERC20Ledger is EternalStorageConnector {
     // Private functions
 
     function _getBalance(address owner) private view returns (uint256) {
-        return _eternalStorage.getUintFromAddressMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner);
+        return whichEternalStorage().getUintFromAddressMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner);
     }
 
     function _setBalance(address owner, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInAddressMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner, value);
+        return whichEternalStorage().setUintInAddressMapping(ERC20LEDGER_CONTRACT_NAME, _BALANCES, owner, value);
     }
 
     function _getAllowance(address owner, address spender) private view returns (uint256) {
-        return _eternalStorage.getUintFromDoubleAddressAddressMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender);
+        return whichEternalStorage().getUintFromDoubleAddressAddressMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender);
     }
 
     function _setAllowance(address owner, address spender, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInDoubleAddressAddressMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender, value);
+        return whichEternalStorage().setUintInDoubleAddressAddressMapping(ERC20LEDGER_CONTRACT_NAME, _ALLOWED, owner, spender, value);
     }
 
     function _getTotalSupply() private view returns (uint256) {
-        return _eternalStorage.getUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY);
+        return whichEternalStorage().getUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY);
     }
 
     function _setTotalSupply(uint256 value) private returns (bool) {
-        return _eternalStorage.setUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY, value);
+        return whichEternalStorage().setUint(ERC20LEDGER_CONTRACT_NAME, _TOTALSUPPLY, value);
     }
 
 }

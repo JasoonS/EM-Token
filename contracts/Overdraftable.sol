@@ -103,10 +103,10 @@ contract Overdraftable is IOverdraftable, Compliant {
     // Private functions
 
     function _setInterestEngine(address wallet, address engine) private returns (bool) {
-        return _eternalStorage.setAddressInAddressMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet, engine);
+        return whichEternalStorage().setAddressInAddressMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet, engine);
     }
 
     function _getInterestEngine(address wallet) private view returns (address) {
-        return _eternalStorage.getAddressFromAddressMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet);
+        return whichEternalStorage().getAddressFromAddressMapping(OVERDRAFTABLE_CONTRACT_NAME, _INTEREST_ENGINES, wallet);
     }
 }

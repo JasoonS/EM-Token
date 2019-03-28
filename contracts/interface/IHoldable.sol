@@ -25,10 +25,10 @@ interface IHoldable {
     ); // By holder (which can be the payer as well)
 
     event HoldExecuted(address indexed holder, string indexed operationId, HoldStatusCode status); // By notary or by operator
-
     event HoldReleased(address indexed holder, string indexed operationId, HoldStatusCode status); // By notary, by payee, by operator, or due to expiration
-
     event HoldRenewed(address indexed holder, string indexed operationId, uint256 oldExpiration, uint256 newExpiration); // By holder
+    event ApprovalToHold(address indexed wallet, address indexed holder);
+    event RevokeApprovalToHold(address indexed wallet, address indexed holder);
 
     /**
      * @notice This function allows wallet owners to approve other addresses to perform holds on their behalf

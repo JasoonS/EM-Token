@@ -1,6 +1,6 @@
 pragma solidity ^0.5;
 
-import "./Compliant.sol";
+import "./Holdable.sol";
 import "./interface/IPayoutable.sol";
 
 /**
@@ -10,7 +10,7 @@ import "./interface/IPayoutable.sol";
  * "requestFrom" type of method), and requests are executed or rejected by the tokenizing entity (i.e. processed by
  * the owner of the overall contract)
  */
-contract Payoutable is IPayoutable, Compliant {
+contract Payoutable is IPayoutable, Holdable {
 
     using SafeMath for uint256;
 
@@ -20,47 +20,36 @@ contract Payoutable is IPayoutable, Compliant {
 
     /**
      * @dev Data structures (implemented in the eternal storage):
-     * @dev _PAYOUT_ORDERERS : address array with the addresses of the orderers of the payouts
-     * @dev _PAYOUT_IDS : string array with payout IDs
-     * @dev _WALLETS_TO_DEBIT : address array with the addresses from which the funds should be taken
-     * @dev _PAYOUT_AMOUNTS : uint256 array with the payout amounts being requested
-     * @dev _PAYOUT_INSTRUCTIONS : string array with the payout instructions (e.g. a reference to the bank account
-     * to transfer the money to)
-     * @dev _PAYOUT_STATUS_CODES : PayoutStatusCode array with the status code for the payout request
-     * @dev _PAYOUT_IDS_INDEXES : mapping (address => mapping (string => uint256) storing the indexes for payout requests data
-     * (this is to allow equal IDs to be used by different orderers)
+     * @dev _WALLETS_TO_DEBIT : mapping (address => mapping (string => address)) with the addresses from which the
+     * funds should be taken
+     * @dev _PAYOUT_AMOUNTS : mapping (address => mapping (string => uint256)) with the payout amounts being requested
+     * @dev _PAYOUT_INSTRUCTIONS : mapping (address => mapping (string => string)) with the payout instructions (e.g.
+     * a reference to the bank account to transfer the money to)
+     * @dev _PAYOUT_STATUS_CODES : mapping (address => mapping (string => PayoutStatusCode)) with the status codes for
+     * the payout requests
      * @dev _PAYOUT_APPROVALS : mapping (address => mapping (address => bool)) storing the permissions for addresses
      * to request payouts on behalf of wallets
      */
-    bytes32 constant private _PAYOUT_ORDERERS =   "_payoutOrderers";
-    bytes32 constant private _PAYOUT_IDS =          "_payoutIds";
     bytes32 constant private _WALLETS_TO_DEBIT =    "_walletsToDebit";
     bytes32 constant private _PAYOUT_AMOUNTS =      "_payoutAmounts";
     bytes32 constant private _PAYOUT_INSTRUCTIONS = "_payoutInstructions";
     bytes32 constant private _PAYOUT_STATUS_CODES = "_payoutStatusCodes";
-    bytes32 constant private _PAYOUT_IDS_INDEXES =  "_payoutIdsIndexes";
     bytes32 constant private _PAYOUT_APPROVALS =    "_payoutApprovals";
 
     // Modifiers
 
     modifier payoutExists(address orderer, string memory operationId) {
-        require(_getPayoutIndex(orderer, operationId) > 0, "Payout request does not exist");
-        _;
-    }
-
-    modifier payoutIndexExists(uint256 index) {
-        require(index > 0 && index <= _manyPayouts(), "Payout request does not exist");
+        require(_doesPayoutExist(orderer, operationId), "Payout request does not exist");
         _;
     }
 
     modifier payoutDoesNotExist(address orderer, string memory operationId) {
-        require(_getPayoutIndex(orderer, operationId) == 0, "Payout request already exists");
+        require(!_doesPayoutExist(orderer, operationId), "Payout request already exist");
         _;
     }
     
     modifier payoutInStatus(address orderer, string memory operationId, PayoutStatusCode status) {
-        uint256 index = _getPayoutIndex(orderer, operationId);
-        require(_getPayoutStatus(index) == status, "Payout in the wrong status");
+        require(_getPayoutStatus(orderer, operationId) == status, "Payout in the wrong status");
         _;
     }
 
@@ -108,8 +97,7 @@ contract Payoutable is IPayoutable, Compliant {
         address orderer = msg.sender;
         address walletToDebit = msg.sender;
         _check(_canOrderPayout, walletToDebit, orderer, amount);
-        _createPayout(orderer, operationId, walletToDebit, amount, instructions);
-        return true;
+        return _createPayout(orderer, operationId, walletToDebit, amount, instructions);
     }
 
     /**
@@ -131,9 +119,9 @@ contract Payoutable is IPayoutable, Compliant {
         returns (bool)
     {
         address orderer = msg.sender;
+        require(orderer == walletToDebit || _isApprovedToOrderPayout(walletToDebit, orderer), "Not approved to request payout");
         _check(_canOrderPayout, walletToDebit, orderer, amount);
-        _createPayout(orderer, operationId, walletToDebit, amount, instructions);
-        return true;
+        return _createPayout(orderer, operationId, walletToDebit, amount, instructions);
     }
 
     /**
@@ -147,11 +135,9 @@ contract Payoutable is IPayoutable, Compliant {
         returns (bool)
     {
         address orderer = msg.sender;
-        uint256 index = _getPayoutIndex(orderer, operationId);
-        _setPayoutStatus(index, PayoutStatusCode.Cancelled);
-        _finalizeHold(orderer, operationId, 0);
+        _finalizeHold(orderer, operationId, HoldStatusCode.ReleasedByNotary);
         emit PayoutCancelled(orderer, operationId);
-        return true;
+        return _setPayoutStatus(orderer, operationId, PayoutStatusCode.Cancelled);
     }
 
     /**
@@ -174,10 +160,8 @@ contract Payoutable is IPayoutable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getPayoutIndex(orderer, operationId);
-        _setPayoutStatus(index, PayoutStatusCode.InProcess);
         emit PayoutInProcess(orderer, operationId);
-        return true;
+        return _setPayoutStatus(orderer, operationId, PayoutStatusCode.InProcess);
     }
 
     /**
@@ -197,17 +181,15 @@ contract Payoutable is IPayoutable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getPayoutIndex(orderer, operationId);
-        PayoutStatusCode status = _getPayoutStatus(index);
+        PayoutStatusCode status = _getPayoutStatus(orderer, operationId);
         require(status == PayoutStatusCode.Ordered || status == PayoutStatusCode.InProcess, "Hold cannot be executed in payout");
-        address walletToDebit = _getWalletToDebit(index);
-        uint256 amount = _getPayoutAmount(index);
+        address walletToDebit = _getWalletToDebit(orderer, operationId);
+        uint256 amount = _getPayoutAmount(orderer, operationId);
         _removeFunds(walletToDebit, amount);
         _increaseBalance(SUSPENSE_WALLET, amount);
-        _finalizeHold(orderer, operationId, 0);
-        _setPayoutStatus(index, PayoutStatusCode.FundsInSuspense);
+        _finalizeHold(orderer, operationId, HoldStatusCode.ExecutedByNotary);
         emit PayoutFundsInSuspense(orderer, operationId);
-        return true;
+        return _setPayoutStatus(orderer, operationId, PayoutStatusCode.FundsInSuspense);
     }
 
     /**
@@ -226,12 +208,10 @@ contract Payoutable is IPayoutable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getPayoutIndex(orderer, operationId);
-        uint256 amount = _getPayoutAmount(index);
+        uint256 amount = _getPayoutAmount(orderer, operationId);
         _decreaseBalance(SUSPENSE_WALLET, amount);
-        _setPayoutStatus(index, PayoutStatusCode.Executed);
         emit PayoutExecuted(orderer, operationId);
-        return true;
+        return _setPayoutStatus(orderer, operationId, PayoutStatusCode.Executed);
     }
 
     /**
@@ -249,15 +229,11 @@ contract Payoutable is IPayoutable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getPayoutIndex(orderer, operationId);
-        PayoutStatusCode status = _getPayoutStatus(index);
-        if(status == PayoutStatusCode.InProcess || status == PayoutStatusCode.Ordered) {
-            _finalizeHold(orderer, operationId, 0);
-        } else {
-            require(false, "Payout request cannot be rejected");
-        }
+        PayoutStatusCode status = _getPayoutStatus(orderer, operationId);
+        require(status == PayoutStatusCode.Ordered || status == PayoutStatusCode.InProcess, "Payout request cannot be rejected");
+        _finalizeHold(orderer, operationId, HoldStatusCode.ReleasedByNotary);
         emit PayoutRejected(orderer, operationId, reason);
-        return _setPayoutStatus(index, PayoutStatusCode.Rejected);
+        return _setPayoutStatus(orderer, operationId, PayoutStatusCode.Rejected);
     }
 
     // External view functions
@@ -271,6 +247,15 @@ contract Payoutable is IPayoutable, Compliant {
     function isApprovedToOrderPayout(address walletToDebit, address orderer) external view returns (bool) {
         return _isApprovedToOrderPayout(walletToDebit, orderer);
     }
+
+    /**
+     * @notice Returns whether the clearable transfer exists
+     * @param orderer The orderer of the clearable transfer
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     */
+    function doesPayoutExist(address orderer, string calldata operationId) external view returns (bool) {
+        return _doesPayoutExist(orderer, operationId);
+    } 
 
     /**
      * @notice Function to retrieve all the information available for a particular payout
@@ -293,123 +278,79 @@ contract Payoutable is IPayoutable, Compliant {
             PayoutStatusCode status
         )
     {
-        uint256 index = _getPayoutIndex(orderer, operationId);
-        walletToDebit = _getWalletToDebit(index);
-        amount = _getPayoutAmount(index);
-        instructions = _getPayoutInstructions(index);
-        status = _getPayoutStatus(index);
+        walletToDebit = _getWalletToDebit(orderer, operationId);
+        amount = _getPayoutAmount(orderer, operationId);
+        instructions = _getPayoutInstructions(orderer, operationId);
+        status = _getPayoutStatus(orderer, operationId);
     }
 
-    // Utility admin functions
+    // Internal functions
 
-    /**
-     * @notice Function to retrieve all the information available for a particular payout request
-     * @param index The index of the payout request
-     * @return orderer: address that issued the payout request
-     * @return operationId: the ID of the payout request (from this orderer)
-     * @return walletToDebit: The address of the wallet from which the funds will be taken
-     * @return amount: the amount of funds requested
-     * @return instructions: the routing instructions to determine the destination of the funds being requested
-     * @return status: the current status of the payout request
-     */
-    function retrievePayoutData(uint256 index)
-        external view
-        returns (address orderer, string memory operationId, address walletToDebit, uint256 amount, string memory instructions, PayoutStatusCode status)
+    function _createPayout(address orderer, string memory operationId, address walletToDebit, uint256 amount, string memory instructions)
+        internal
+        payoutDoesNotExist(orderer, operationId)
+        returns (bool)
     {
-        orderer = _getPayoutOrder(index);
-        operationId = _getPayoutTransactionId(index);
-        walletToDebit = _getWalletToDebit(index);
-        amount = _getPayoutAmount(index);
-        instructions = _getPayoutInstructions(index);
-        status = _getPayoutStatus(index);
+        require(amount >= _availableFunds(walletToDebit), "Not enough funds to ask for payout");
+        _createHold(orderer, operationId, walletToDebit, SUSPENSE_WALLET, address(0), amount, false, 0); // No notary or status, as this is going to be managed by the methods
+        emit PayoutOrdered(orderer, operationId, walletToDebit, amount, instructions);
+        return
+            _setWalletToDebit(orderer, operationId, walletToDebit) &&
+            _setPayoutAmount(orderer, operationId, amount) &&
+            _setPayoutInstructions(orderer, operationId, instructions) &&
+            _setPayoutStatus(orderer, operationId, PayoutStatusCode.Ordered);
     }
 
-    /**
-     * @notice This function returns the amount of payout requests outstanding and closed, since they are stored in an
-     * array and the position in the array constitutes the ID of each payout request
-     * @return The number of payout requests (both open and already closed)
-     */
-    function manyPayouts() external view returns (uint256 many) {
-        return _manyPayouts();
+    function _doesPayoutExist(address orderer, string memory operationId) internal view returns (bool) {
+        return _getPayoutStatus(orderer, operationId) != PayoutStatusCode.Nonexistent;
     }
 
-    // Private functions
+    // Private functions wrapping access to eternal storage
 
-    function _manyPayouts() private view returns (uint256 many) {
-        return _eternalStorage.getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS, 0);
+    function _getWalletToDebit(address orderer, string memory operationId) private view returns (address walletToDebit) {
+        walletToDebit = whichEternalStorage().getAddressFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, orderer, operationId);
     }
 
-    function _getPayoutOrder(uint256 index) private view payoutIndexExists(index) returns (address orderer) {
-        orderer = _eternalStorage.getAddressFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_ORDERERS, index);
+    function _setWalletToDebit(address orderer, string memory operationId, address walletToDebit) private returns (bool) {
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, orderer, operationId, walletToDebit);
     }
 
-    function _getPayoutIndex(
-        address orderer,
-        string memory operationId
-    )
-        private view
-        payoutExists(orderer, operationId)
-        returns (uint256 index)
-    {
-        index = _eternalStorage.getUintFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, orderer, operationId);
+    function _getPayoutAmount(address orderer, string memory operationId) private view returns (uint256 amount) {
+        amount = whichEternalStorage().getUintFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, orderer, operationId);
     }
 
-    function _getPayoutTransactionId(uint256 index) private view payoutIndexExists(index) returns (string memory operationId) {
-        operationId = _eternalStorage.getStringFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, index);
+    function _setPayoutAmount(address orderer, string memory operationId, uint256 amount) private returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, orderer, operationId, amount);
     }
 
-    function _getWalletToDebit(uint256 index) private view payoutIndexExists(index) returns (address walletToDebit) {
-        walletToDebit = _eternalStorage.getAddressFromArray(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, index);
+    function _getPayoutInstructions(address orderer, string memory operationId) private view returns (string memory instructions) {
+        instructions = whichEternalStorage().getStringFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, orderer, operationId);
     }
 
-    function _getPayoutAmount(uint256 index) private view payoutIndexExists(index) returns (uint256 amount) {
-        amount = _eternalStorage.getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, index);
+    function _setPayoutInstructions(address orderer, string memory operationId, string memory instructions) private returns (bool) {
+        return whichEternalStorage().setStringInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, orderer, operationId, instructions);
     }
 
-    function _getPayoutInstructions(uint256 index) private view payoutIndexExists(index) returns (string memory instructions) {
-        instructions = _eternalStorage.getStringFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, index);
+    function _getPayoutStatus(address orderer, string memory operationId) private view returns (PayoutStatusCode status) {
+        status = PayoutStatusCode(whichEternalStorage().getUintFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, orderer, operationId));
     }
 
-    function _getPayoutStatus(uint256 index) private view payoutIndexExists(index) returns (PayoutStatusCode status) {
-        status = PayoutStatusCode(_eternalStorage.getUintFromArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, index));
-    }
-
-    function _setPayoutStatus(uint256 index, PayoutStatusCode status) private payoutIndexExists(index) returns (bool) {
-        return _eternalStorage.setUintInArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, index, uint256(status));
+    function _setPayoutStatus(address orderer, string memory operationId, PayoutStatusCode status) private returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, orderer, operationId, uint256(status));
     }
 
     function _approveToOrderPayout(address walletToDebit, address orderer) private returns (bool) {
         emit ApprovalToOrderPayout(walletToDebit, orderer);
-        return _eternalStorage.setBoolInDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, orderer, true);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, orderer, true);
     }
 
     function _revokeApprovalToOrderPayout(address walletToDebit, address orderer) private returns (bool) {
         emit RevokeApprovalToOrderPayout(walletToDebit, orderer);
-        return _eternalStorage.setBoolInDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, orderer, false);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, orderer, false);
     }
 
-    function _isApprovedToOrderPayout(address walletToDebit, address orderer) public view returns (bool){
-        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, orderer);
-    }
-
-    function _createPayout(address orderer, string memory operationId, address walletToDebit, uint256 amount, string memory instructions)
-        private
-        payoutDoesNotExist(orderer, operationId)
-        returns (uint256 index)
-    {
-        require(orderer == walletToDebit || _isApprovedToOrderPayout(walletToDebit, orderer), "Not approved to request payout");
-        require(amount >= _availableFunds(walletToDebit), "Not enough funds to ask for payout");
-        _createHold(orderer, operationId, walletToDebit, SUSPENSE_WALLET, address(0), amount, false, 0, 0); // No notary or status, as this is going to be managed by the methods
-       _eternalStorage. pushAddressToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_ORDERERS, orderer);
-        _eternalStorage.pushStringToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS, operationId);
-        _eternalStorage.pushAddressToArray(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, walletToDebit);
-        _eternalStorage.pushUintToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_AMOUNTS, amount);
-        _eternalStorage.pushStringToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_INSTRUCTIONS, instructions);
-        _eternalStorage.pushUintToArray(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_STATUS_CODES, uint256(PayoutStatusCode.Ordered));
-        index = _manyPayouts();
-        _eternalStorage.setUintInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_IDS_INDEXES, orderer, operationId, index);
-        emit PayoutOrdered(orderer, operationId, walletToDebit, amount, instructions);
-        return index;
+    function _isApprovedToOrderPayout(address walletToDebit, address orderer) private view returns (bool){
+        return whichEternalStorage().getBoolFromDoubleAddressAddressMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_APPROVALS, walletToDebit, orderer);
     }
 
 }

@@ -20,55 +20,40 @@ contract Fundable is IFundable, Compliant {
 
     /**
      * @dev Data structures (implemented in the eternal storage):
-     * @dev _FUNDING_ORDERERS : address array with the addresses of the requesters of the funds
-     * @dev _FUNDING_IDS : string array with funding IDs
-     * @dev _WALLETS_TO_FUND : address array with the addresses that should receive the funds requested
-     * @dev _FUNDING_AMOUNTS : uint256 array with the funding amounts being requested
-     * @dev _FUNDING_INSTRUCTIONS : string array with the funding instructions (e.g. a reference to the bank account
-     * to debit)
-     * @dev _FUNDING_STATUS_CODES : FundingStatusCode array with the status code for the funding request
-     * @dev _FUNDING_IDS_INDEXES : mapping (address => mapping (string => uint256) storing the indexes for funding requests data
-     * (this is to allow equal IDs to be used by different requesters)
+     * @dev _WALLETS_TO_FUND : mapping (address => mapping (string => address)) storing the wallets to fund for each funding request
+     * @dev _FUNDING_AMOUNTS : mapping (address => mapping (string => uint256)) storing the funding amouns for each funding request
+     * @dev _FUNDING_INSTRUCTIONS : mapping (address => mapping (string => string)) storing the funding instructions for each funding request
+     * @dev _FUNDING_STATUS_CODES : mapping (address => mapping (string => FundingStatusCode)) storing the status codes of each funding request
      * @dev _FUNDING_APPROVALS : mapping (address => mapping (address => bool)) storing the permissions for addresses
      * to request funding on behalf of wallets
      */
-    bytes32 constant private _FUNDING_ORDERERS =     "_fundingOrderers";
-    bytes32 constant private _FUNDING_IDS =          "_fundingIds";
     bytes32 constant private _WALLETS_TO_FUND =      "_walletsToFund";
     bytes32 constant private _FUNDING_AMOUNTS =      "_fundingAmounts";
     bytes32 constant private _FUNDING_INSTRUCTIONS = "_fundingInstructions";
     bytes32 constant private _FUNDING_STATUS_CODES = "_fundingStatusCodes";
-    bytes32 constant private _FUNDING_IDS_INDEXES =  "_fundingIdsIndexes";
     bytes32 constant private _FUNDING_APPROVALS =    "_fundingApprovals";
 
     // Modifiers
 
     modifier fundingExists(address orderer, string memory operationId) {
-        require(_getFundingIndex(orderer, operationId) > 0, "Funding request does not exist");
-        _;
-    }
-
-    modifier fundingIndexExists(uint256 index) {
-        require(index > 0 && index <= _manyFundings(), "Funding request does not exist");
+        require(_doesFundingExist(orderer, operationId), "Funding request does not exist");
         _;
     }
 
     modifier fundingDoesNotExist(address orderer, string memory operationId) {
-        require(_getFundingIndex(orderer, operationId) == 0, "Funding request already exists");
+        require(!_doesFundingExist(orderer, operationId), "Funding request already exists");
         _;
     }
     
-    modifier fundingJustCreated(address orderer, string memory operationId) {
-        uint256 index = _getFundingIndex(orderer, operationId);
-        require(_getFundingStatus(index) == FundingStatusCode.Ordered, "Funding request is already closed");
+    modifier fundingJustOrdered(address orderer, string memory operationId) {
+        require(_getFundingStatus(orderer, operationId) == FundingStatusCode.Ordered, "Funding request is already closed");
         _;
     }
 
     modifier fundingNotClosed(address orderer, string memory operationId) {
-        uint256 index = _getFundingIndex(orderer, operationId);
-        FundingStatusCode status = _getFundingStatus(index);
         require(
-            status == FundingStatusCode.Ordered || status == FundingStatusCode.InProcess,
+            _getFundingStatus(orderer, operationId) == FundingStatusCode.Ordered ||
+            _getFundingStatus(orderer, operationId) == FundingStatusCode.InProcess,
             "Funding request not in process"
         );
         _;
@@ -118,8 +103,7 @@ contract Fundable is IFundable, Compliant {
         address orderer = msg.sender;
         address walletToFund = msg.sender;
         _check(_canOrderFunding, walletToFund, orderer, amount);
-        _createFunding(orderer, operationId, walletToFund, amount, instructions);
-        return true;
+        return _createFunding(orderer, operationId, walletToFund, amount, instructions);
     }
 
     /**
@@ -141,9 +125,9 @@ contract Fundable is IFundable, Compliant {
         returns (bool)
     {
         address orderer = msg.sender;
+        require(orderer == walletToFund || _isApprovedToOrderFunding(walletToFund, orderer), "Not approved to request funding");
         _check(_canOrderFunding, walletToFund, orderer, amount);
-        _createFunding(orderer, operationId, walletToFund, amount, instructions);
-        return true;
+        return _createFunding(orderer, operationId, walletToFund, amount, instructions);
     }
 
     /**
@@ -153,14 +137,12 @@ contract Fundable is IFundable, Compliant {
      * @dev Only the original orderer can actually cancel an outstanding request
      */
     function cancelFunding(string calldata operationId) external
-        fundingNotClosed(msg.sender, operationId)
+        fundingJustOrdered(msg.sender, operationId)
         returns (bool)
     {
         address orderer = msg.sender;
-        uint256 index = _getFundingIndex(orderer, operationId);
-        _setFundingStatus(index, FundingStatusCode.Cancelled);
         emit FundingCancelled(orderer, operationId);
-        return true;
+        return _setFundingStatus(orderer, operationId, FundingStatusCode.Cancelled);
     }
 
     /**
@@ -177,14 +159,12 @@ contract Fundable is IFundable, Compliant {
      * 
      */
     function processFunding(address orderer, string calldata operationId) external
-        fundingJustCreated(orderer, operationId)
+        fundingJustOrdered(orderer, operationId)
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getFundingIndex(orderer, operationId);
-        _setFundingStatus(index, FundingStatusCode.InProcess);
         emit FundingInProcess(orderer, operationId);
-        return true;
+        return _setFundingStatus(orderer, operationId, FundingStatusCode.InProcess);
     }
 
     /**
@@ -202,13 +182,11 @@ contract Fundable is IFundable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getFundingIndex(orderer, operationId);
-        address walletToFund = _getWalletToFund(index);
-        uint256 amount = _getFundingAmount(index);
+        address walletToFund = _getWalletToFund(orderer, operationId);
+        uint256 amount = _getFundingAmount(orderer, operationId);
         _addFunds(walletToFund, amount);
-        _setFundingStatus(index, FundingStatusCode.Executed);
         emit FundingExecuted(orderer, operationId);
-        return true;
+        return _setFundingStatus(orderer, operationId, FundingStatusCode.Executed);
     }
 
     /**
@@ -225,9 +203,8 @@ contract Fundable is IFundable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getFundingIndex(orderer, operationId);
         emit FundingRejected(orderer, operationId, reason);
-        return _setFundingStatus(index, FundingStatusCode.Rejected);
+        return _setFundingStatus(orderer, operationId, FundingStatusCode.Rejected);
     }
 
     // External view functions
@@ -241,6 +218,15 @@ contract Fundable is IFundable, Compliant {
     function isApprovedToOrderFunding(address walletToFund, address orderer) external view returns (bool) {
         return _isApprovedToOrderFunding(walletToFund, orderer);
     }
+
+    /**
+     * @notice Returns whether the funding request exists
+     * @param orderer The orderer of the funding request
+     * @param operationId The ID of the funding, which can then be used to index all the information about
+     */
+    function doesFundingExist(address orderer, string calldata operationId) external view returns (bool) {
+        return _doesFundingExist(orderer, operationId);
+    } 
 
     /**
      * @notice Function to retrieve all the information available for a particular funding request
@@ -263,121 +249,77 @@ contract Fundable is IFundable, Compliant {
             FundingStatusCode status
         )
     {
-        uint256 index = _getFundingIndex(orderer, operationId);
-        walletToFund = _getWalletToFund(index);
-        amount = _getFundingAmount(index);
-        instructions = _getFundingInstructions(index);
-        status = _getFundingStatus(index);
+        walletToFund = _getWalletToFund(orderer, operationId);
+        amount = _getFundingAmount(orderer, operationId);
+        instructions = _getFundingInstructions(orderer, operationId);
+        status = _getFundingStatus(orderer, operationId);
     }
 
-    // Utility admin functions
-
-    /**
-     * @notice Function to retrieve all the information available for a particular funding request
-     * @param index The index of the funding request
-     * @return orderer: address that issued the funding request
-     * @return operationId: the ID of the funding request (from this orderer)
-     * @return walletToFund: the wallet to which the requested funds are directed to
-     * @return amount: the amount of funds requested
-     * @return instructions: the routing instructions to determine the source of the funds being requested
-     * @return status: the current status of the funding request
-     */
-    function retrieveFundingData(uint256 index)
-        external view
-        returns (address orderer, string memory operationId, address walletToFund, uint256 amount, string memory instructions, FundingStatusCode status)
-    {
-        orderer = _getFundingOrderer(index);
-        operationId = _getOperationId(index);
-        walletToFund = _getWalletToFund(index);
-        amount = _getFundingAmount(index);
-        instructions = _getFundingInstructions(index);
-        status = _getFundingStatus(index);
-    }
-
-    /**
-     * @notice This function returns the amount of funding requests outstanding and closed, since they are stored in an
-     * array and the position in the array constitutes the ID of each funding request
-     * @return The number of funding requests (both open and already closed)
-     */
-    function manyFundings() external view returns (uint256 many) {
-        return _manyFundings();
-    }
-
-    // Private functions
-
-    function _manyFundings() private view returns (uint256 many) {
-        return _eternalStorage.getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS, 0);
-    }
-
-    function _getFundingOrderer(uint256 index) private view fundingIndexExists(index) returns (address orderer) {
-        orderer = _eternalStorage.getAddressFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_ORDERERS, index);
-    }
-
-    function _getFundingIndex(
-        address orderer,
-        string memory operationId
-    )
-        private view
-        fundingExists(orderer, operationId)
-        returns (uint256 index)
-    {
-        index = _eternalStorage.getUintFromDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, orderer, operationId);
-    }
-
-    function _getOperationId(uint256 index) private view fundingIndexExists(index) returns (string memory operationId) {
-        operationId = _eternalStorage.getStringFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, index);
-    }
-
-    function _getWalletToFund(uint256 index) private view fundingIndexExists(index) returns (address walletToFund) {
-        walletToFund = _eternalStorage.getAddressFromArray(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, index);
-    }
-
-    function _getFundingAmount(uint256 index) private view fundingIndexExists(index) returns (uint256 amount) {
-        amount = _eternalStorage.getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, index);
-    }
-
-    function _getFundingInstructions(uint256 index) private view fundingIndexExists(index) returns (string memory instructions) {
-        instructions = _eternalStorage.getStringFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, index);
-    }
-
-    function _getFundingStatus(uint256 index) private view fundingIndexExists(index) returns (FundingStatusCode status) {
-        status = FundingStatusCode(_eternalStorage.getUintFromArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, index));
-    }
-
-    function _setFundingStatus(uint256 index, FundingStatusCode status) private fundingIndexExists(index) returns (bool) {
-        return _eternalStorage.setUintInArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, index, uint256(status));
-    }
-
-    function _approveToOrderFunding(address walletToFund, address orderer) private returns (bool) {
-        emit ApprovalToOrderFunding(walletToFund, orderer);
-        return _eternalStorage.setBoolInDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, orderer, true);
-    }
-
-    function _revokeApprovalToOrderFunding(address walletToFund, address orderer) private returns (bool) {
-        emit RevokeApprovalToOrderFunding(walletToFund, orderer);
-        return _eternalStorage.setBoolInDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, orderer, false);
-    }
-
-    function _isApprovedToOrderFunding(address walletToFund, address orderer) public view returns (bool){
-        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, orderer);
-    }
+    // Internal functions
 
     function _createFunding(address orderer, string memory operationId, address walletToFund, uint256 amount, string memory instructions)
         private
         fundingDoesNotExist(orderer, operationId)
-        returns (uint256 index)
+        returns (bool)
     {
-        require(orderer == walletToFund || _isApprovedToOrderFunding(walletToFund, orderer), "Not approved to request funding");
-        _eternalStorage.pushAddressToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_ORDERERS, orderer);
-        _eternalStorage.pushStringToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS, operationId);
-        _eternalStorage.pushAddressToArray(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, walletToFund);
-        _eternalStorage.pushUintToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, amount);
-        _eternalStorage.pushStringToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, instructions);
-        _eternalStorage.pushUintToArray(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, uint256(FundingStatusCode.Ordered));
-        index = _manyFundings();
-        _eternalStorage.setUintInDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_IDS_INDEXES, orderer, operationId, index);
         emit FundingOrdered(orderer, operationId, walletToFund, amount, instructions);
-        return index;
+        return
+            _setWalletToFund(orderer, operationId, walletToFund) &&
+            _setFundingAmount(orderer, operationId, amount) &&
+            _setFundingInstructions(orderer, operationId, instructions) &&
+            _setFundingStatus(orderer, operationId, FundingStatusCode.Ordered);
+    }
+
+    function _doesFundingExist(address orderer, string memory operationId) internal view returns (bool) {
+        return whichEternalStorage().getUintFromDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, orderer, operationId) != uint256(FundingStatusCode.Nonexistent);
+    }
+
+    // Private functions wrapping access to eternal storage
+
+    function _getWalletToFund(address orderer, string memory operationId) private view returns (address walletToFund) {
+        walletToFund = whichEternalStorage().getAddressFromDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, orderer, operationId);
+    }
+
+    function _setWalletToFund(address orderer, string memory operationId, address walletToFund) private returns (bool) {
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _WALLETS_TO_FUND, orderer, operationId, walletToFund);
+    }
+
+    function _getFundingAmount(address orderer, string memory operationId) private view returns (uint256 amount) {
+        amount = whichEternalStorage().getUintFromDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, orderer, operationId);
+    }
+
+    function _setFundingAmount(address orderer, string memory operationId, uint256 amount) private returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_AMOUNTS, orderer, operationId, amount);
+    }
+
+    function _getFundingInstructions(address orderer, string memory operationId) private view returns (string memory instructions) {
+        instructions = whichEternalStorage().getStringFromDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, orderer, operationId);
+    }
+
+    function _setFundingInstructions(address orderer, string memory operationId, string memory instructions) private returns (bool) {
+        return whichEternalStorage().setStringInDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_INSTRUCTIONS, orderer, operationId, instructions);
+    }
+
+    function _getFundingStatus(address orderer, string memory operationId) private view returns (FundingStatusCode status) {
+        status = FundingStatusCode(FundingStatusCode(whichEternalStorage().getUintFromDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, orderer, operationId)));
+    }
+
+    function _setFundingStatus(address orderer, string memory operationId, FundingStatusCode status) private returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_STATUS_CODES, orderer, operationId, uint256(status));
+    }
+
+    function _approveToOrderFunding(address walletToFund, address orderer) private returns (bool) {
+        emit ApprovalToOrderFunding(walletToFund, orderer);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, orderer, true);
+    }
+
+    function _revokeApprovalToOrderFunding(address walletToFund, address orderer) private returns (bool) {
+        emit RevokeApprovalToOrderFunding(walletToFund, orderer);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, orderer, false);
+    }
+
+    function _isApprovedToOrderFunding(address walletToFund, address orderer) private view returns (bool){
+        return whichEternalStorage().getBoolFromDoubleAddressAddressMapping(FUNDABLE_CONTRACT_NAME, _FUNDING_APPROVALS, walletToFund, orderer);
     }
 
 }

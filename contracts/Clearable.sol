@@ -1,6 +1,6 @@
 pragma solidity ^0.5;
 
-import "./Compliant.sol";
+import "./Holdable.sol";
 import "./interface/IClearable.sol";
 
 /**
@@ -10,7 +10,7 @@ import "./interface/IClearable.sol";
  * (or someone delegated through an approval) requests the transfer; ii) the token issuer clears the transfer (offchain); and
  * iii) then the token issuer triggers the execution of the transfer, which moves the tokens from the sender to the receiver.
  */
-contract Clearable is IClearable, Compliant {
+contract Clearable is IClearable, Holdable {
 
     using SafeMath for uint256;
 
@@ -20,53 +20,42 @@ contract Clearable is IClearable, Compliant {
 
     /**
      * @dev Data structures (implemented in the eternal storage):
-     * @dev _CLEARABLE_TRANSFER_IDS : string array with clearable transfer IDs
-     * @dev _CLEARABLE_TRANSFER_ORDERERS : address array with the addresses of the orderers of the clearable transfers
-     * @dev _FROM_WALLETS : address array with the addresses from which the funds will be transferred
-     * @dev _TO_WALLETS : address array with the addresses to which the funds will be transferred
-     * @dev _CLEARABLE_TRANSFER_AMOUNTS : uint256 array with the clearable transfer amounts being ordered
-     * @dev _CLEARABLE_TRANSFER_STATUS_CODES : ClearableTransferStatusCode array with the status code for the clearable
-     * transfer
-     * @dev _CLEARABLE_TRANSFER_IDS_INDEXES : mapping (address => mapping (string => uint256) storing the indexes for clearable 
-     * transfers  data (this is to allow equal IDs to be used by different orderers)
+     * @dev _FROM_WALLETS : mapping (address => mapping (string => address)) with the addresses from which the funds will be
+     * transferred
+     * @dev _TO_WALLETS : mapping (address => mapping (string => address)) with the addresses to which the funds will be
+     * transferred
+     * @dev _CLEARABLE_TRANSFER_AMOUNTS : mapping (address => mapping (string => uint256)) with the clearable transfer amounts
+     * being ordered
+     * @dev _CLEARABLE_TRANSFER_STATUS_CODES : mapping (address => mapping (string => ClearableTransferStatusCode)) with the
+     * status code for the clearable transfer
      * @dev _CLEARABLE_TRANSFER_APPROVALS : mapping (address => mapping (address => bool)) storing the permissions for
      * addresses to order clearable transfers on behalf of wallets
      */
-    bytes32 constant private _CLEARABLE_TRANSFER_IDS =          "_clearableTransferIds";
-    bytes32 constant private _CLEARABLE_TRANSFER_ORDERERS =   "_clearableTransferOrderers";
     bytes32 constant private _FROM_WALLETS =                  "_fromWallets";
     bytes32 constant private _TO_WALLETS =                    "_toWallets";
     bytes32 constant private _CLEARABLE_TRANSFER_AMOUNTS =      "_clearableTransferAmounts";
     bytes32 constant private _CLEARABLE_TRANSFER_STATUS_CODES = "_clearableTransferStatusCodes";
-    bytes32 constant private _CLEARABLE_TRANSFER_IDS_INDEXES =  "_clearableTransferIdsIndexes";
     bytes32 constant private _CLEARABLE_TRANSFER_APPROVALS =    "_clearableTransferApprovals";
 
     // Modifiers
 
     modifier clearableTransferExists(address orderer, string memory operationId) {
-        require(_getClearableTransferIndex(orderer, operationId) > 0, "ClearableTransfer does not exist");
-        _;
-    }
-
-    modifier clearableTransferIndexExists(uint256 index) {
-        require(index > 0 && index <= _manyClearableTransfers(), "ClearableTransfer does not exist");
+        require(_doesClearableTransferExist(orderer, operationId), "ClearableTransfer does not exist");
         _;
     }
 
     modifier clearableTransferDoesNotExist(address orderer, string memory operationId) {
-        require(_getClearableTransferIndex(orderer, operationId) == 0, "ClearableTransfer already exists");
+        require(!_doesClearableTransferExist(orderer, operationId), "ClearableTransfer already exists");
         _;
     }
     
     modifier clearableTransferJustCreated(address orderer, string memory operationId) {
-        uint256 index = _getClearableTransferIndex(orderer, operationId);
-        require(_getClearableTransferStatus(index) == ClearableTransferStatusCode.Ordered, "ClearableTransfer is already closed");
+        require(_getClearableTransferStatus(orderer, operationId) == ClearableTransferStatusCode.Ordered, "ClearableTransfer is already closed");
         _;
     }
 
     modifier clearableTransferNotClosed(address orderer, string memory operationId) {
-        uint256 index = _getClearableTransferIndex(orderer, operationId);
-        ClearableTransferStatusCode status = _getClearableTransferStatus(index);
+        ClearableTransferStatusCode status = _getClearableTransferStatus(orderer, operationId);
         require(
             status == ClearableTransferStatusCode.Ordered || status == ClearableTransferStatusCode.InProcess,
             "ClearableTransfer not in process"
@@ -116,8 +105,7 @@ contract Clearable is IClearable, Compliant {
         address orderer = msg.sender;
         address from = msg.sender;
         _check(_canOrderClearableTransfer, from, to, amount);
-        _createClearableTransferRequest(orderer, operationId, from, to, amount);
-        return true;
+        return _createClearableTransferRequest(orderer, operationId, from, to, amount);
     }
 
     /**
@@ -139,9 +127,9 @@ contract Clearable is IClearable, Compliant {
         returns (bool)
     {
         address orderer = msg.sender;
+        require(orderer == from || _isApprovedToOrderClearableTransfer(from, orderer), "Not approved to order clearable transfers");
         _check(_canOrderClearableTransfer, from, to, amount);
-        _createClearableTransferRequest(orderer, operationId, from, to, amount);
-        return true;
+        return _createClearableTransferRequest(orderer, operationId, from, to, amount);
     }
 
     /**
@@ -155,11 +143,9 @@ contract Clearable is IClearable, Compliant {
         returns (bool)
     {
         address orderer = msg.sender;
-        uint256 index = _getClearableTransferIndex(orderer, operationId);
-        _setClearableTransferStatus(index, ClearableTransferStatusCode.Cancelled);
-        _finalizeHold(orderer, operationId, 0);
+        _setClearableTransferStatus(orderer, operationId, ClearableTransferStatusCode.Cancelled);
         emit ClearableTransferCancelled(orderer, operationId);
-        return true;
+        return _finalizeHold(orderer, operationId, HoldStatusCode.ReleasedByNotary);
     }
 
     /**
@@ -179,10 +165,8 @@ contract Clearable is IClearable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getClearableTransferIndex(orderer, operationId);
-        _setClearableTransferStatus(index, ClearableTransferStatusCode.InProcess);
         emit ClearableTransferInProcess(orderer, operationId);
-        return true;
+        return _setClearableTransferStatus(orderer, operationId, ClearableTransferStatusCode.InProcess);
     }
 
     /**
@@ -199,16 +183,14 @@ contract Clearable is IClearable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getClearableTransferIndex(orderer, operationId);
-        address from = _getFrom(index);
-        address to = _getTo(index);
-        uint256 amount = _getClearableTransferAmount(index);
+        address from = _getClearableTransferFrom(orderer, operationId);
+        address to = _getClearableTransferTo(orderer, operationId);
+        uint256 amount = _getClearableTransferAmount(orderer, operationId);
         _decreaseBalance(from, amount);
         _increaseBalance(to, amount);
-        _finalizeHold(orderer, operationId, 0);
-        _setClearableTransferStatus(index, ClearableTransferStatusCode.Executed);
+        _finalizeHold(orderer, operationId, HoldStatusCode.ExecutedByNotary);
         emit ClearableTransferExecuted(orderer, operationId);
-        return true;
+        return _setClearableTransferStatus(orderer, operationId, ClearableTransferStatusCode.Executed);
     }
 
     /**
@@ -225,11 +207,10 @@ contract Clearable is IClearable, Compliant {
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
-        uint256 index = _getClearableTransferIndex(orderer, operationId);
-        _finalizeHold(orderer, operationId, 0);
-        _setClearableTransferStatus(index, ClearableTransferStatusCode.Rejected);
+        _finalizeHold(orderer, operationId, HoldStatusCode.ReleasedByNotary);
+        _setClearableTransferStatus(orderer, operationId, ClearableTransferStatusCode.Rejected);
         emit ClearableTransferRejected(orderer, operationId, reason);
-        return _setClearableTransferStatus(index, ClearableTransferStatusCode.Rejected);
+        return _setClearableTransferStatus(orderer, operationId, ClearableTransferStatusCode.Rejected);
     }
 
     // External view functions
@@ -243,6 +224,15 @@ contract Clearable is IClearable, Compliant {
     function isApprovedToOrderClearableTransfer(address wallet, address orderer) external view returns (bool) {
         return _isApprovedToOrderClearableTransfer(wallet, orderer);
     }
+
+    /**
+     * @notice Returns whether the clearable transfer exists
+     * @param orderer The orderer of the clearable transfer
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     */
+    function doesClearableTransferExist(address orderer, string calldata operationId) external view returns (bool) {
+        return _doesClearableTransferExist(orderer, operationId);
+    } 
 
     /**
      * @notice Function to retrieve all the information available for a particular clearable transfer
@@ -265,111 +255,13 @@ contract Clearable is IClearable, Compliant {
             ClearableTransferStatusCode status
         )
     {
-        uint256 index = _getClearableTransferIndex(orderer, operationId);
-        from = _getFrom(index);
-        to = _getTo(index);
-        amount = _getClearableTransferAmount(index);
-        status = _getClearableTransferStatus(index);
+        from = _getClearableTransferFrom(orderer, operationId);
+        to = _getClearableTransferTo(orderer, operationId);
+        amount = _getClearableTransferAmount(orderer, operationId);
+        status = _getClearableTransferStatus(orderer, operationId);
     }
 
-    // Utility admin functions
-
-    /**
-     * @notice Function to retrieve all the information available for a particular clearable transfer
-     * @param index The index of the clearable transfer
-     * @return orderer: address that issued the clearable transfer
-     * @return operationId: the ID of the clearable transfer (from this orderer)
-     * @return toDebit: The address of the wallet from which the funds will be taken
-     * @return amount: the amount of funds requested
-     * @return instructions: the routing instructions to determine the destination of the funds being requested
-     * @return status: the current status of the clearable transfer
-     */
-    function retrieveClearableTransferData(uint256 index)
-        external view
-        returns (
-            address orderer,
-            string memory operationId,
-            address from,
-            address to,
-            uint256 amount,
-            ClearableTransferStatusCode status
-        )
-    {
-        orderer = _getClearableTransferOrderer(index);
-        operationId = _getOperationId(index);
-        from = _getFrom(index);
-        to = _getTo(index);
-        amount = _getClearableTransferAmount(index);
-        status = _getClearableTransferStatus(index);
-    }
-
-    /**
-     * @notice This function returns the amount of clearable transfers outstanding and closed, since they are stored in an
-     * array and the position in the array constitutes the ID of each clearable transfer
-     * @return The number of clearable transfers (both open and already closed)
-     */
-    function manyClearableTransfers() external view returns (uint256 many) {
-        return _manyClearableTransfers();
-    }
-
-    // Private functions
-
-    function _approveToRequestClearableTransfer(address wallet, address orderer) private returns (bool) {
-        emit ApprovalToOrderClearableTransfer(wallet, orderer);
-        return _eternalStorage.setBoolInDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_APPROVALS, wallet, orderer, true);
-    }
-
-    function _revokeApprovalToRequestClearableTransfer(address wallet, address orderer) private returns (bool) {
-        emit RevokeApprovalToOrderClearableTransfer(wallet, orderer);
-        return _eternalStorage.setBoolInDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_APPROVALS, wallet, orderer, false);
-    }
-
-    function _isApprovedToOrderClearableTransfer(address wallet, address orderer) public view returns (bool){
-        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_APPROVALS, wallet, orderer);
-    }
-
-    function _manyClearableTransfers() private view returns (uint256 many) {
-        return _eternalStorage.getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_IDS, 0);
-    }
-
-    function _getClearableTransferOrderer(uint256 index) private view clearableTransferIndexExists(index) returns (address orderer) {
-        orderer = _eternalStorage.getAddressFromArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_ORDERERS, index);
-    }
-
-    function _getClearableTransferIndex(
-        address orderer,
-        string memory operationId
-    )
-        private view
-        clearableTransferExists(orderer, operationId)
-        returns (uint256 index)
-    {
-        index = _eternalStorage.getUintFromDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_IDS_INDEXES, orderer, operationId);
-    }
-
-    function _getOperationId(uint256 index) private view clearableTransferIndexExists(index) returns (string memory operationId) {
-        operationId = _eternalStorage.getStringFromArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_IDS_INDEXES, index);
-    }
-
-    function _getFrom(uint256 index) private view clearableTransferIndexExists(index) returns (address from) {
-        from = _eternalStorage.getAddressFromArray(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, index);
-    }
-
-    function _getTo(uint256 index) private view clearableTransferIndexExists(index) returns (address to) {
-        to = _eternalStorage.getAddressFromArray(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, index);
-    }
-
-    function _getClearableTransferAmount(uint256 index) private view clearableTransferIndexExists(index) returns (uint256 amount) {
-        amount = _eternalStorage.getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_AMOUNTS, index);
-    }
-
-    function _getClearableTransferStatus(uint256 index) private view clearableTransferIndexExists(index) returns (ClearableTransferStatusCode status) {
-        status = ClearableTransferStatusCode(_eternalStorage.getUintFromArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_STATUS_CODES, index));
-    }
-
-    function _setClearableTransferStatus(uint256 index, ClearableTransferStatusCode status) private clearableTransferIndexExists(index) returns (bool) {
-        return _eternalStorage.setUintInArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_STATUS_CODES, index, uint256(status));
-    }
+    // Internal functions
 
     function _createClearableTransferRequest(
         address orderer,
@@ -378,23 +270,70 @@ contract Clearable is IClearable, Compliant {
         address to,
         uint256 amount
     )
-        private
+        internal
         clearableTransferDoesNotExist(orderer, operationId)
-        returns (uint256 index)
+        returns (bool)
     {
-        require(orderer == from || _isApprovedToOrderClearableTransfer(from, orderer), "Not approved to order clearable transfers");
         require(amount >= _availableFunds(from), "Not enough funds to request clearable transfer");
-        _createHold(orderer, operationId, from, to, address(0), amount, false, 0, 0); // No notary or status, as this is going to be managed by the methods
-        _eternalStorage.pushAddressToArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_ORDERERS, orderer);
-        _eternalStorage.pushStringToArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_IDS, operationId);
-        _eternalStorage.pushAddressToArray(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, from);
-        _eternalStorage.pushAddressToArray(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, to);
-        _eternalStorage.pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_AMOUNTS, amount);
-        _eternalStorage.pushUintToArray(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_STATUS_CODES, uint256(ClearableTransferStatusCode.Ordered));
-        index = _manyClearableTransfers();
-        _eternalStorage.setUintInDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_IDS_INDEXES, orderer, operationId, index);
+        _createHold(orderer, operationId, from, to, address(0), amount, false, 0); // No notary or status, as this is going to be managed by the methods
         emit ClearableTransferOrdered(orderer, operationId, from, to, amount);
-        return index;
+        return
+            _setClearableTransferFrom(orderer, operationId, from) &&
+            _setClearableTransferTo(orderer, operationId, to) &&
+            _setClearableTransferAmount(orderer, operationId, amount) &&
+            _setClearableTransferStatus(orderer, operationId, ClearableTransferStatusCode.Ordered);
+    }
+
+    function _doesClearableTransferExist(address orderer, string memory operationId) internal view returns (bool) {
+        return _getClearableTransferStatus(orderer, operationId) != ClearableTransferStatusCode.Nonexistent;
+    }
+
+    // Private functions wrapping access to eternal storage
+    
+    function _getClearableTransferFrom(address orderer, string memory operationId) private view returns (address from) {
+        from = whichEternalStorage().getAddressFromDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, orderer, operationId);
+    }
+
+    function _setClearableTransferFrom(address orderer, string memory operationId, address from) private returns (bool) {
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _FROM_WALLETS, orderer, operationId, from);
+    }
+
+    function _getClearableTransferTo(address orderer, string memory operationId) private view returns (address to) {
+        to = whichEternalStorage().getAddressFromDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, orderer, operationId);
+    }
+
+    function _setClearableTransferTo(address orderer, string memory operationId, address to) private returns (bool) {
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _TO_WALLETS, orderer, operationId, to);
+    }
+
+    function _getClearableTransferAmount(address orderer, string memory operationId) private view returns (uint256 amount) {
+        amount = whichEternalStorage().getUintFromDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_AMOUNTS, orderer, operationId);
+    }
+
+    function _setClearableTransferAmount(address orderer, string memory operationId, uint256 amount) private returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_AMOUNTS, orderer, operationId, amount);
+    }
+
+    function _getClearableTransferStatus(address orderer, string memory operationId) private view returns (ClearableTransferStatusCode status) {
+        status = ClearableTransferStatusCode(whichEternalStorage().getUintFromDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_STATUS_CODES, orderer, operationId));
+    }
+
+    function _setClearableTransferStatus(address orderer, string memory operationId, ClearableTransferStatusCode status) private  returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_STATUS_CODES, orderer, operationId, uint256(status));
+    }
+
+    function _approveToRequestClearableTransfer(address wallet, address orderer) private returns (bool) {
+        emit ApprovalToOrderClearableTransfer(wallet, orderer);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_APPROVALS, wallet, orderer, true);
+    }
+
+    function _revokeApprovalToRequestClearableTransfer(address wallet, address orderer) private returns (bool) {
+        emit RevokeApprovalToOrderClearableTransfer(wallet, orderer);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_APPROVALS, wallet, orderer, false);
+    }
+
+    function _isApprovedToOrderClearableTransfer(address wallet, address orderer) private view returns (bool){
+        return whichEternalStorage().getBoolFromDoubleAddressAddressMapping(CLEARABLE_CONTRACT_NAME, _CLEARABLE_TRANSFER_APPROVALS, wallet, orderer);
     }
 
 }

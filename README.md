@@ -155,6 +155,8 @@ event HoldCreated(address indexed holder, string indexed operationId, address fr
 event HoldExecuted(address indexed holder, string indexed operationId, HoldStatusCode status);
 event HoldReleased(address indexed holder, string indexed operationId, HoldStatusCode status);
 event HoldRenewed(address indexed holder, string indexed operationId, uint256 oldExpiration, uint256 newExpiration);
+event ApprovalToHold(address indexed wallet, address indexed holder);
+event RevokeApprovalToHold(address indexed wallet, address indexed holder);
 ```
 
 ### _Overdrafts_

@@ -28,15 +28,40 @@ contract Holdable is IHoldable, Compliant {
 
     /**
      * @dev Data structures:
+     * @dev _HOLD_FROMS : mapping (address => mapping (string => address)) with the payers of the holds
+     * @dev _HOLD_TOS : mapping (address => mapping (string => address)) with the payees of the holds
+     * @dev _HOLD_NOTARIES : mapping (address => mapping (string => address)) with the notaries of the holds
+     * @dev _HOLD_AMOUNTS : mapping (address => mapping (string => uint)) with the amounts of the holds
+     * @dev _HOLD_EXPIRES : mapping (address => mapping (string => bool)) with the flags that mark whether
+     * holds expire or not
+     * @dev _HOLD_EXPIRATIONS : mapping (address => mapping (string => uint)) with the expirations of the holds
+     * @dev _HOLD_STATUS_CODES : mapping (address => mapping (string => uint)) with the status codes of the holds
      * @dev _HOLDING_APPROVALS : mapping (address => mapping (address => bool)) storing the permissions for addresses
      * to perform holds on behalf of wallets
      */
+    bytes32 constant private _HOLD_FROMS =        "_holdFroms";
+    bytes32 constant private _HOLD_TOS =          "_holdTos";
+    bytes32 constant private _HOLD_NOTARIES =     "_holdNotaries";
+    bytes32 constant private _HOLD_AMOUNTS =      "_holdAmounts";
+    bytes32 constant private _HOLD_EXPIRES =      "_holdExpires";
+    bytes32 constant private _HOLD_EXPIRATIONS =  "_holdExpirations";
+    bytes32 constant private _HOLD_STATUS_CODES = "_holdStatusCodes";
     bytes32 constant private _HOLDING_APPROVALS = "_holdingApprovals";
 
     // Modifiers
 
+    modifier holdExists(address holder, string memory operationId) {
+        require (_doesHoldExist(holder, operationId), "Hold does not exist");
+        _;
+    }
+
+    modifier holdDoesNotExist(address holder, string memory operationId) {
+        require (!_doesHoldExist(holder, operationId), "Hold exists");
+        _;
+    }
+
     modifier holdActive(address holder, string memory operationId) {
-        require (_holdStatus(holder, operationId) == uint256(HoldStatusCode.Ordered), "Hold not active");
+        require (_getHoldStatus(holder, operationId) == HoldStatusCode.Ordered, "Hold not active");
         _;
     }
 
@@ -51,7 +76,7 @@ contract Holdable is IHoldable, Compliant {
     function approveToHold(address holder) external returns (bool)
     {
         _check(_canApproveToHold, msg.sender, holder);
-        return _setHoldingApproval(msg.sender, holder, true);
+        return _approveToHold(msg.sender, holder);
     }
 
     /**
@@ -60,7 +85,7 @@ contract Holdable is IHoldable, Compliant {
      */
     function revokeApprovalToHold(address holder) external returns (bool)
     {
-        return _setHoldingApproval(msg.sender, holder, false);
+        return _revokeApprovalToHold(msg.sender, holder);
     }
 
     /**
@@ -91,8 +116,7 @@ contract Holdable is IHoldable, Compliant {
         address holder = msg.sender;
         address from = msg.sender;
         _check(_canHold, from, to, notary, amount);
-        _hold(holder, operationId, from, to, notary, amount, expires, timeToExpiration);
-        return true;
+        return _createHold(holder, operationId, from, to, notary, amount, expires, timeToExpiration);
     }
 
     /**
@@ -123,9 +147,9 @@ contract Holdable is IHoldable, Compliant {
         returns (bool)
     {
         address holder = msg.sender;
+        require(from == msg.sender || _isApprovedToHold(from, msg.sender), "Requester is not approved to hold");
         _check(_canHold, from, to, notary, amount);
-        _hold(holder, operationId, from, to, notary, amount, expires, timeToExpiration);
-        return true;
+        return _createHold(holder, operationId, from, to, notary, amount, expires, timeToExpiration);
     }
 
     /**
@@ -135,13 +159,19 @@ contract Holdable is IHoldable, Compliant {
      * @dev holder and operationId are needed to index a hold. This is provided so different holders can use the same operationId,
      * as holding is a competitive resource
      */
-    function releaseHold(address holder, string calldata operationId) external holdActive(holder, operationId) returns (bool)
+    function releaseHold(
+        address holder,
+        string calldata operationId
+    )
+        external
+        holdActive(holder, operationId)
+        returns (bool)
     {
-        address from = _holdFrom(holder, operationId);
-        address to = _holdTo(holder, operationId);
-        address notary = _holdNotary(holder, operationId);
-        bool expires = _holdExpires(holder, operationId);
-        uint256 expiration = _holdExpiration(holder, operationId);
+        address from = _getHoldFrom(holder, operationId);
+        address to = _getHoldTo(holder, operationId);
+        address notary = _getHoldNotary(holder, operationId);
+        bool expires = _getHoldExpires(holder, operationId);
+        uint256 expiration = _getHoldExpiration(holder, operationId);
         HoldStatusCode finalStatus;
         if(_hasRole(msg.sender, OPERATOR_ROLE)) {
             finalStatus = HoldStatusCode.ReleasedByOperator;
@@ -155,7 +185,7 @@ contract Holdable is IHoldable, Compliant {
             require(false, "Hold cannot be released");
         }
         emit HoldReleased(holder, operationId, finalStatus);
-        return _finalizeHold(msg.sender, operationId, uint256(finalStatus));
+        return _finalizeHold(msg.sender, operationId, finalStatus);
     }
     
     /**
@@ -166,14 +196,20 @@ contract Holdable is IHoldable, Compliant {
      * as holding is a competitive resource
      * @dev Holds that are expired can still be executed by the notary or the operator (as well as released by anyone)
      */
-    function executeHold(address holder, string calldata operationId) external holdActive(holder, operationId) returns (bool)
+    function executeHold(
+        address holder,
+        string calldata operationId
+    )
+        external
+        holdActive(holder, operationId)
+        returns (bool)
     {
-        address from = _holdFrom(holder, operationId);
-        address to = _holdTo(holder, operationId);
-        address notary = _holdNotary(holder, operationId);
-        uint256 amount = _holdAmount(holder, operationId);
-        bool expires = _holdExpires(holder, operationId);
-        uint256 expiration = _holdExpiration(holder, operationId);
+        address from = _getHoldFrom(holder, operationId);
+        address to = _getHoldTo(holder, operationId);
+        address notary = _getHoldNotary(holder, operationId);
+        uint256 amount = _getHoldAmount(holder, operationId);
+        bool expires = _getHoldExpires(holder, operationId);
+        uint256 expiration = _getHoldExpiration(holder, operationId);
         HoldStatusCode finalStatus;
         require(!expires || block.timestamp < expiration, "Hold is expired and cannot be released");
         if(_hasRole(msg.sender, OPERATOR_ROLE)) {
@@ -186,7 +222,7 @@ contract Holdable is IHoldable, Compliant {
         _removeFunds(from, amount);
         _addFunds(to, amount);
         emit HoldExecuted(holder, operationId, finalStatus);
-        return _finalizeHold(holder, operationId, uint256(finalStatus));
+        return _finalizeHold(holder, operationId, finalStatus);
     }
 
     /**
@@ -196,9 +232,8 @@ contract Holdable is IHoldable, Compliant {
      * @dev Non closed holds can be renewed, including holds that are already expired
      */
     function renewHold(string calldata operationId, uint256 timeToExpirationFromNow) external holdActive(msg.sender, operationId) returns (bool) {
-        _changeTimeToHold(msg.sender, operationId, timeToExpirationFromNow);
+        return _setHoldExpiration(msg.sender, operationId, block.timestamp.add(timeToExpirationFromNow));
     }
-
 
     // External view functions
 
@@ -209,9 +244,17 @@ contract Holdable is IHoldable, Compliant {
      * @return Whether the holder is approved or not to hold on behalf of the wallet owner
      */
     function isApprovedToHold(address wallet, address holder) external view returns (bool) {
-        return _getHoldingApproval(wallet, holder);
+        return _isApprovedToHold(wallet, holder);
     }
 
+    /**
+     * @notice Returns whether the clearable transfer exists
+     * @param holder The holder of the clearable transfer
+     * @param operationId The ID of the clearable transfer, which can then be used to index all the information about
+     */
+    function doesHoldExist(address holder, string calldata operationId) external view returns (bool) {
+        return _doesHoldExist(holder, operationId);
+    } 
     /**
      * @notice Function to retrieve all the information available for a particular hold
      * @param holder The address of the original sender of the hold
@@ -239,13 +282,13 @@ contract Holdable is IHoldable, Compliant {
             HoldStatusCode status
         )
     {
-        from = _holdFrom(holder, operationId);
-        to = _holdTo(holder, operationId);
-        notary = _holdNotary(holder, operationId);
-        amount = _holdAmount(holder, operationId);
-        expires = _holdExpires(holder, operationId);
-        expiration = _holdExpiration(holder, operationId);
-        status = HoldStatusCode(_holdStatus(holder, operationId));
+        from = _getHoldFrom(holder, operationId);
+        to = _getHoldTo(holder, operationId);
+        notary = _getHoldNotary(holder, operationId);
+        amount = _getHoldAmount(holder, operationId);
+        expires = _getHoldExpires(holder, operationId);
+        expiration = _getHoldExpiration(holder, operationId);
+        status = HoldStatusCode(_getHoldStatus(holder, operationId));
     }
 
     /**
@@ -265,68 +308,10 @@ contract Holdable is IHoldable, Compliant {
         return _totalSupplyOnHold();
     }
 
-    // Utility admin functions
+    // Internal functions
 
-    /**
-     * @dev Function to know how many holds are there (open and closed)
-     * @return The total holds count
-     */
-    function manyHolds() external view returns (uint256) {
-        return _manyHolds();
-    }
-
-    /**
-     * @notice Function to retrieve all the information available for a particular hold
-     * @param  index The position in the holds array
-     * @return holder: The address of the original sender of the hold
-     * @return operationId: The ID of the hold in question
-     * @return from: The address of the payer, from which the tokens are to be taken (if the hold is executed)
-     * @return to: The address of the payee, to which the tokens are to be paid (if the hold is executed)
-     * @return notary: the address that will be executing or releasing the hold
-     * @return amount: the amount that will be transferred
-     * @return expires: a flag indicating whether the hold expires or not
-     * @return expiration: (only relevant in case expires==true) the absolute time (block.timestamp) by which the hold will
-     * expire (after that time the hold can be released by anyone)
-     * @return status: the current status of the hold
-     * @dev holder and operationId are needed to index a hold. This is provided so different issuers can use the same operationId,
-     * as holding is a competitive resource
-     */
-    function retrieveHoldData(uint256 index)
-        external view
-        returns (
-            address holder,
-            string memory operationId,
-            address from,
-            address to,
-            address notary,
-            uint256 amount,
-            bool expires,
-            uint256 expiration,
-            HoldStatusCode status
-        )
-    {
-        (holder, operationId) = _getHoldId(index);
-        from = _holdFrom(holder, operationId);
-        to = _holdTo(holder, operationId);
-        notary = _holdNotary(holder, operationId);
-        amount = _holdAmount(holder, operationId);
-        expires = _holdExpires(holder, operationId);
-        expiration = _holdExpiration(holder, operationId);
-        status = HoldStatusCode(_holdStatus(holder, operationId));
-    }
-
-    // Private functions
-
-    function _getHoldingApproval(address wallet, address holder) private view returns (bool) {
-        return _eternalStorage.getBoolFromDoubleAddressAddressMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder);
-    }
-
-    function _setHoldingApproval(address wallet, address holder, bool value) private returns (bool) {
-        return _eternalStorage.setBoolInDoubleAddressAddressMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder, value);
-    }
-
-    function _hold(
-        address requester,
+    function _createHold(
+        address holder,
         string  memory operationId,
         address from,
         address to,
@@ -335,14 +320,113 @@ contract Holdable is IHoldable, Compliant {
         bool    expires,
         uint256 timeToExpiration
     )
-        private
-        returns (uint256 index)
+        internal
+        holdDoesNotExist(holder, operationId)
+        returns (bool)
     {
-        require(from == msg.sender || _getHoldingApproval(from, msg.sender), "Requester is not approved to hold");
         require(amount >= _availableFunds(from), "Not enough funds to hold");
         uint256 expiration = block.timestamp.add(timeToExpiration);
-        emit HoldCreated(requester, operationId, from, to, notary, amount, expires, expiration);
-        index = _createHold(requester, operationId, from, to, notary, amount, expires, expiration, uint256(HoldStatusCode.Ordered));
+        _addBalanceOnHold(from, amount);
+        emit HoldCreated(holder, operationId, from, to, notary, amount, expires, expiration);
+        return
+            _setHoldFrom(holder, operationId, from) &&
+            _setHoldFrom(holder, operationId, to) &&
+            _setHoldNotary(holder, operationId, notary) &&
+            _setHoldAmount(holder, operationId, amount) &&
+            _setHoldExpires(holder, operationId, expires) &&
+            _setHoldExpiration(holder, operationId, expiration);
+    }
+
+    function _finalizeHold(
+        address holder,
+        string memory operationId,
+        HoldStatusCode status
+    )
+        internal
+        holdActive(holder, operationId)
+        returns (bool)
+    {
+        address from = _getHoldFrom(holder, operationId);
+        uint256 amount = _getHoldAmount(holder, operationId);
+        return
+            _substractBalanceOnHold(from, amount) &&
+            _setHoldStatus(holder, operationId, status);
+    }
+
+    function _doesHoldExist(address orderer, string memory operationId) internal view returns (bool) {
+        return _getHoldStatus(orderer, operationId) != HoldStatusCode.Nonexistent;
+    }
+
+    // Private functions wrapping access to eternal storage
+
+    function _getHoldFrom(address holder, string memory operationId) internal view returns (address from) {
+        from = whichEternalStorage().getAddressFromDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_FROMS, holder, operationId);
+    }
+
+    function _setHoldFrom(address holder, string memory operationId, address from) internal returns (bool) {
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_FROMS, holder, operationId, from);
+    }
+
+    function _getHoldTo(address holder, string memory operationId) internal view returns (address to) {
+        to = whichEternalStorage().getAddressFromDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_TOS, holder, operationId);
+    }
+
+    function _setHoldTo(address holder, string memory operationId, address to) internal returns (bool) {
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_TOS, holder, operationId, to);
+    }
+
+    function _getHoldNotary(address holder, string memory operationId) internal view returns (address notary) {
+        notary = whichEternalStorage().getAddressFromDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_NOTARIES, holder, operationId);
+    }
+
+    function _setHoldNotary(address holder, string memory operationId, address notary) internal returns (bool) {
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_NOTARIES, holder, operationId, notary);
+    }
+
+    function _getHoldAmount(address holder, string memory operationId) internal view returns (uint256 amount) {
+        amount = whichEternalStorage().getUintFromDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_AMOUNTS, holder, operationId);
+    }
+
+    function _setHoldAmount(address holder, string memory operationId, uint256 amount) internal returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_AMOUNTS, holder, operationId, amount);
+    }
+
+    function _getHoldExpires(address holder, string memory operationId) internal view returns (bool expires) {
+        expires = whichEternalStorage().getBoolFromDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_EXPIRES, holder, operationId);
+    }
+
+    function _setHoldExpires(address holder, string memory operationId, bool expires) internal returns (bool) {
+        return whichEternalStorage().setBoolInDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_EXPIRES, holder, operationId, expires);
+    }
+
+    function _getHoldExpiration(address holder, string memory operationId) internal view returns (uint256 expiration) {
+        expiration = whichEternalStorage().getUintFromDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_EXPIRATIONS, holder, operationId);
+    }
+
+    function _setHoldExpiration(address holder, string memory operationId, uint256 expiration) internal returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_EXPIRATIONS, holder, operationId, expiration);
+    }
+
+    function _getHoldStatus(address holder, string memory operationId) internal view returns (HoldStatusCode status) {
+        return HoldStatusCode(whichEternalStorage().getUintFromDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_STATUS_CODES, holder, operationId));
+    }
+
+    function _setHoldStatus(address holder, string memory operationId, HoldStatusCode status) internal returns (bool) {
+        return whichEternalStorage().setUintInDoubleAddressStringMapping(HOLDABLE_CONTRACT_NAME, _HOLD_STATUS_CODES, holder, operationId, uint256(status));
+    }
+
+    function _approveToHold(address wallet, address holder) private returns (bool) {
+        emit ApprovalToHold(wallet, holder);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder, true);
+    }
+
+    function _revokeApprovalToHold(address wallet, address holder) private returns (bool) {
+        emit RevokeApprovalToHold(wallet, holder);
+        return whichEternalStorage().setBoolInDoubleAddressAddressMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder, false);
+    }
+
+    function _isApprovedToHold(address wallet, address holder) private view returns (bool){
+        return whichEternalStorage().getBoolFromDoubleAddressAddressMapping(HOLDABLE_CONTRACT_NAME, _HOLDING_APPROVALS, wallet, holder);
     }
 
 }

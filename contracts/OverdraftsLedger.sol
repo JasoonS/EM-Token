@@ -73,27 +73,27 @@ contract OverdraftsLedger is EternalStorageConnector {
     // Private functions
 
     function _getUnsecuredOverdraftLimit(address wallet) private view returns (uint256) {
-        return _eternalStorage.getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet);
+        return whichEternalStorage().getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet);
     }
 
     function _writeUnsecuredOverdraftLimit(address wallet, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet, value);
+        return whichEternalStorage().setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _UNSECURED_OVERDRAFT_LIMITS, wallet, value);
     }
 
     function _getDrawnAmount(address wallet) private view returns (uint256) {
-        return _eternalStorage.getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet);
+        return whichEternalStorage().getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet);
     }
 
     function _setDrawnAmounts(address wallet, uint256 value) private returns (bool) {
-        return _eternalStorage.setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet, value);
+        return whichEternalStorage().setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet, value);
     }
 
     function _getTotalDrawnAmount() private view returns (uint256) {
-        return _eternalStorage.getUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS);
+        return whichEternalStorage().getUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS);
     }
 
     function _setTotalDrawnAmount(uint256 value) private returns (bool) {
-        return _eternalStorage.setUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, value);
+        return whichEternalStorage().setUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, value);
     }
 
 }

@@ -6,24 +6,18 @@ interface IFundable {
 
     event FundingOrdered(
         address indexed orderer,
-        string indexed operationId,
+        string operationId,
         address indexed walletToFund,
         uint256 amount,
         string instructions
     );
 
-    event FundingInProcess(address indexed orderer, string indexed operationId);
-
-    event FundingExecuted(address indexed orderer, string indexed operationId);
-
-    event FundingRejected(address indexed orderer, string indexed operationId, string reason);
-
-    event FundingCancelled(address indexed orderer, string indexed operationId);
-
+    event FundingInProcess(address indexed orderer, string operationId);
+    event FundingExecuted(address indexed orderer, string operationId);
+    event FundingRejected(address indexed orderer, string operationId, string reason);
+    event FundingCancelled(address indexed orderer, string operationId);
     event ApprovalToOrderFunding(address indexed walletToFund, address indexed orderer);
-
     event RevokeApprovalToOrderFunding(address indexed walletToFund, address indexed orderer);
-
 
     /**
      * @notice This function allows wallet owners to approve other addresses to request funding on their behalf

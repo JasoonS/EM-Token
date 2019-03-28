@@ -58,18 +58,19 @@ contract EMoneyToken is IEMoneyToken, ERC20, Holdable, Overdraftable, Clearable,
         }
 
         setEternalStorage(eternalStorage);
-        if(_eternalStorage.getBool(EMONEYTOKEN_CONTRACT_NAME, _INITIALIZED)) {
-            require(_eternalStorage.getString(EMONEYTOKEN_CONTRACT_NAME, _NAME).equals(name), "Given name different to the one stored in the eternal storage");
-            require(_eternalStorage.getString(EMONEYTOKEN_CONTRACT_NAME, _SYMBOL).equals(symbol), "Given symbol different to the one stored in the eternal storage");
-            require(_eternalStorage.getString(EMONEYTOKEN_CONTRACT_NAME, _CURRENCY).equals(currency), "Given currency different to the one stored in the eternal storage");
-            require(_eternalStorage.getUint(EMONEYTOKEN_CONTRACT_NAME, _DECIMALS) == decimals, "Given decimals different to the one stored in the eternal storage");
+        if(whichEternalStorage().getBool(EMONEYTOKEN_CONTRACT_NAME, _INITIALIZED)) {
+            require(whichEternalStorage().getString(EMONEYTOKEN_CONTRACT_NAME, _NAME).equals(name), "Given name different to the one stored in the eternal storage");
+            require(whichEternalStorage().getString(EMONEYTOKEN_CONTRACT_NAME, _SYMBOL).equals(symbol), "Given symbol different to the one stored in the eternal storage");
+            require(whichEternalStorage().getString(EMONEYTOKEN_CONTRACT_NAME, _CURRENCY).equals(currency), "Given currency different to the one stored in the eternal storage");
+            require(whichEternalStorage().getUint(EMONEYTOKEN_CONTRACT_NAME, _DECIMALS) == decimals, "Given decimals different to the one stored in the eternal storage");
         } else {
-            _eternalStorage.setString(EMONEYTOKEN_CONTRACT_NAME, _NAME, name);
-            _eternalStorage.setString(EMONEYTOKEN_CONTRACT_NAME, _SYMBOL, symbol);
-            _eternalStorage.setString(EMONEYTOKEN_CONTRACT_NAME, _CURRENCY, currency);
-            _eternalStorage.setUint(EMONEYTOKEN_CONTRACT_NAME, _DECIMALS, uint256(decimals));
-            _eternalStorage.setBool(EMONEYTOKEN_CONTRACT_NAME, _INITIALIZED, true);
-            _whitelist(SUSPENSE_WALLET);
+            whichEternalStorage().setString(EMONEYTOKEN_CONTRACT_NAME, _NAME, name);
+            whichEternalStorage().setString(EMONEYTOKEN_CONTRACT_NAME, _SYMBOL, symbol);
+            whichEternalStorage().setString(EMONEYTOKEN_CONTRACT_NAME, _CURRENCY, currency);
+            whichEternalStorage().setUint(EMONEYTOKEN_CONTRACT_NAME, _DECIMALS, uint256(decimals));
+            whichEternalStorage().setBool(EMONEYTOKEN_CONTRACT_NAME, _INITIALIZED, true);
+            // _whitelist(SUSPENSE_WALLET); // This is a bad idea, as the suspense wallet should only be for internal use (e.g. we do not want a
+            // user to send funds to the suspense wallet)
         }
         emit Created(name, symbol, currency, decimals, _version);
     }
@@ -81,7 +82,7 @@ contract EMoneyToken is IEMoneyToken, ERC20, Holdable, Overdraftable, Clearable,
      * @return the name of the token.
      */
     function name() external view returns (string memory) {
-        return _eternalStorage.getString(EMONEYTOKEN_CONTRACT_NAME, _NAME);
+        return whichEternalStorage().getString(EMONEYTOKEN_CONTRACT_NAME, _NAME);
     }
 
     /**
@@ -89,7 +90,7 @@ contract EMoneyToken is IEMoneyToken, ERC20, Holdable, Overdraftable, Clearable,
      * @return the symbol of the token.
      */
     function symbol() external view returns (string memory) {
-        return _eternalStorage.getString(EMONEYTOKEN_CONTRACT_NAME, _SYMBOL);
+        return whichEternalStorage().getString(EMONEYTOKEN_CONTRACT_NAME, _SYMBOL);
     }
 
     /**
@@ -97,7 +98,7 @@ contract EMoneyToken is IEMoneyToken, ERC20, Holdable, Overdraftable, Clearable,
      * @return the currency of the token.
      */
     function currency() external view returns (string memory) {
-        return _eternalStorage.getString(EMONEYTOKEN_CONTRACT_NAME, _CURRENCY);
+        return whichEternalStorage().getString(EMONEYTOKEN_CONTRACT_NAME, _CURRENCY);
     }
 
     /**
@@ -105,7 +106,7 @@ contract EMoneyToken is IEMoneyToken, ERC20, Holdable, Overdraftable, Clearable,
      * @return the number of decimals of the token.
      */
     function decimals() external view returns (uint8) {
-        return uint8(_eternalStorage.getUint(EMONEYTOKEN_CONTRACT_NAME, _DECIMALS));
+        return uint8(whichEternalStorage().getUint(EMONEYTOKEN_CONTRACT_NAME, _DECIMALS));
     }
 
     /**

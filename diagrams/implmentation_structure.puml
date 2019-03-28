@@ -19,7 +19,7 @@ class EMoneyToken {
 class ERC20 {
 }
 
-class Holdable {
+class Fundable {
 }
 
 class Overdraftable {
@@ -28,10 +28,10 @@ class Overdraftable {
 class Clearable {
 }
 
-class Fundable {
+class Payoutable {
 }
 
-class Payoutable {
+class Holdable {
 }
 
 class Compliant {
@@ -62,18 +62,19 @@ class EternalStorage {
 }
 
 EMoneyToken <|-- ERC20
-EMoneyToken <|-- Holdable
 EMoneyToken <|-- Overdraftable
 EMoneyToken <|-- Clearable
 EMoneyToken <|-- Fundable
 EMoneyToken <|-- Payoutable
 
+Clearable <|-- Holdable
+Payoutable <|-- Holdable
+
 ERC20 <|-- Compliant
-Holdable <|-- Compliant
 Overdraftable <|-- Compliant
-Clearable <|-- Compliant
 Fundable <|-- Compliant
-Payoutable <|-- Compliant
+
+Holdable <|-- Compliant
 
 Compliant <|-- Whitelistable
 

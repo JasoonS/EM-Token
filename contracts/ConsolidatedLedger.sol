@@ -13,6 +13,9 @@ import "./OverdraftsLedger.sol";
 contract ConsolidatedLedger is IConsolidatedLedger, ERC20Ledger, HoldsLedger, OverdraftsLedger {
 
     using SafeMath for int256;
+
+    event FundsAddedByOwner(address wallet, uint256 amount);
+    event FundsRemovedByOwner(address wallet, uint256 amount);
     
     // External functions
 
@@ -31,7 +34,27 @@ contract ConsolidatedLedger is IConsolidatedLedger, ERC20Ledger, HoldsLedger, Ov
     function netBalanceOf(address wallet) external view returns (int256) {
         return _balanceOf(wallet).toInt().sub(_drawnAmount(wallet).toInt());
     }
+
+    // Eternal admin functions
+
+    /**
+     * @dev Add funds to wallets (by owner)
+     */
+    function addFundsByOwner(address wallet, uint256 amount) external onlyOwner returns (bool) {
+        _addFunds(wallet, amount);
+        emit FundsAddedByOwner(wallet, amount);
+        return true;
+    }
     
+    /**
+     * @dev Remove funds from wallets (by owner)
+     */
+    function removeFundsByOwner(address wallet, uint256 amount) external onlyOwner returns (bool) {
+        _removeFunds(wallet, amount);
+        emit FundsRemovedByOwner(wallet, amount);
+        return true;
+    }
+
     // Internal functions
     
     function _addFunds(address wallet, uint256 amount) internal {

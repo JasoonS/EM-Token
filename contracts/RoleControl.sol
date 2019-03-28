@@ -29,19 +29,19 @@ contract RoleControl is EternalStorageConnector {
     /**
      * @notice CRO_ROLE is the predefined role with rights to change credit limits.
      */
-    bytes32 constant public CRO_ROLE = "cro";
+    string constant public CRO_ROLE = "cro";
 
     /**
      * @notice OPERATOR_ROLE is the predefined role with rights to perform ledger-related operations, such as
      * honoring funding and redemption requests or clearing transfers
      */
-    bytes32 constant public OPERATOR_ROLE = "operator";
+    string constant public OPERATOR_ROLE = "operator";
 
     /**
      * @notice COMPLIANCE_ROLE is the predefined role with rights to whitelist address, e.g. after checking
      * KYC status
      */
-    bytes32 constant public COMPLIANCE_ROLE = "compliance";
+    string constant public COMPLIANCE_ROLE = "compliance";
 
     // Data structures (in eternal storage)
 
@@ -49,14 +49,14 @@ contract RoleControl is EternalStorageConnector {
 
     /**
      * @dev Data structures
-     * @dev _ROLES :mapping (bytes32 => mapping (address => bool)) storing the repository of roles
+     * @dev _ROLES :mapping (string => mapping (address => bool)) storing the repository of roles
      */
     bytes32 constant private _ROLES = "_roles";
 
     // Events
     
-    event RoleAdded(address indexed account, bytes32 indexed role);
-    event RoleRemoved(address indexed account, bytes32 indexed role);
+    event RoleAdded(address indexed account, string role);
+    event RoleRevoked(address indexed account, string role);
 
     // Constructor
 
@@ -67,7 +67,7 @@ contract RoleControl is EternalStorageConnector {
      * @param account The address being r
      * @param role The role being checked
      */
-    function hasRole(address account, bytes32 role) external view returns (bool) {
+    function hasRole(address account, string calldata role) external view returns (bool) {
         return _hasRole(account, role);
     }
 
@@ -77,7 +77,7 @@ contract RoleControl is EternalStorageConnector {
      * @param account The address to which the role is going to be given
      * @param role The role being given
      */
-    function addRole(address account, bytes32 role) external onlyOwner returns (bool) {
+    function addRole(address account, string calldata role) external onlyOwner returns (bool) {
         require(account != address(0), "Cannot add role to address 0");
         return _addRole(account, role);
     }
@@ -88,53 +88,31 @@ contract RoleControl is EternalStorageConnector {
      * @param account The address being revoked
      * @param role The role being revoked
      */
-    function revokeRole(address account, bytes32 role) external onlyOwner returns (bool) {
+    function revokeRole(address account, string calldata role) external onlyOwner returns (bool) {
         require(account != address(0), "Cannot revoke role from address 0");
         return _removeRole(account, role);
     }
 
-    /**
-     * @notice Allows a role bearer to transfer role to another account
-     * @dev Only a role bearer can transfer its rolw
-     * @param newAccount The address being revoked
-     * @param role The role being transferred
-     */
-    function transferRole(address newAccount, bytes32 role) external returns (bool) {
-        requireRole(role);
-        require(newAccount != address(0), "Cannot transfer role to address 0");
-        _removeRole(msg.sender, role);
-        return _addRole(newAccount, role);
-    }
-
-    /**
-     * @notice Allows an address to renounce a role that was given to it
-     * @dev Admin roles cannot be renounced
-     * @param role The role being renounced
-     */
-    function renounceRole(bytes32 role) external returns (bool) {
-        return _removeRole(msg.sender, role);
-    }
-
     // Internal functions
 
-    function requireRole(bytes32 role) internal view {
+    function requireRole(string memory role) internal view {
         require(_hasRole(msg.sender, role), string("Sender does not have role ").concat(role));
     } 
 
     // Private functions
 
-    function _addRole(address _account, bytes32 role) private returns (bool) {
-        emit RoleAdded(_account, role);
-        return _eternalStorage.setBoolInDoubleBytes32AddressMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, _account, true);
+    function _addRole(address _account, string memory _role) private returns (bool) {
+        emit RoleAdded(_account, _role);
+        return whichEternalStorage().setBoolInDoubleAddressStringMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, _account, _role, true);
     }
 
-    function _removeRole(address account, bytes32 role) private returns (bool) {
-        emit RoleRemoved(account, role);
-        return _eternalStorage.deleteBoolFromDoubleBytes32AddressMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
+    function _removeRole(address _account, string memory _role) private returns (bool) {
+        emit RoleRevoked(_account, _role);
+        return whichEternalStorage().deleteBoolFromDoubleAddressStringMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, _account, _role);
     }
 
-    function _hasRole(address account, bytes32 role) public view returns (bool) {
-        return _eternalStorage.getBoolFromDoubleBytes32AddressMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, role, account);
+    function _hasRole(address _account, string memory _role) public view returns (bool) {
+        return whichEternalStorage().getBoolFromDoubleAddressStringMapping(ROLECONTROL_CONTRACT_NAME, _ROLES, _account, _role);
     }
 
 }
