@@ -1,0 +1,649 @@
+const EMoneyToken = artifacts.require("EMoneyToken");
+const truffleAssert = require('truffle-assertions'); // install with: npm install truffle-assertions
+
+var FundingStatusCode = Object.freeze({"Nonexistent":0, "Ordered":1, "InProcess":2, "Executed":3, "Rejected":4, "Cancelled":5});
+
+contract("EMoneyToken", accounts => {
+
+    // Common to all tests
+    const owner = accounts[9]
+    const cro = accounts[8]
+    const operator = accounts[7]
+    const compliance = accounts[6]
+    const userAccount1 = accounts[5]
+    const userAccount2 = accounts[4]
+    const userAccount3 = accounts[3]
+    const notary1 = accounts[2]
+    const notWhilisted1 = accounts[1]
+    const notWhilisted2 = accounts[0]
+    
+    // Constants for this test
+    
+    var instance
+    var _result
+
+    before( async () => {
+        console.log("  > Now testing blah");
+        instance = await EMoneyToken.deployed();
+        console.log("  > Contract address is", instance.address);
+    })
+
+    it("Compliance check functions for funding should work", async () => {
+    });
+
+    // Now testing redemptions
+
+//     it("Whitelisted users should be able to request redemptions", done => {
+//         instance.requestRedeem(25000, "No particular redemption instructions", {from:userAccount1}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Suspended", "Suspended event not issued");
+//             assert.equal(event1.args.account, userAccount1, "Incorrect argument in Suspended event");
+//             assert.equal(event1.args.value, 25000, "Incorrect argument in Suspended event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "RedeemRequested", "RedeemRequested event not issued");
+//             assert.equal(event2.args.redeemId, 0, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.redeemer, userAccount1, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.amount, 25000, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.instructions, "No particular redemption instructions", "Incorrect argument in RedeemRequested event");
+//             instance.manyRedeemRequests.call().then(_result => {
+//                 assert.equal(_result, 1, "Redeem request not registered into array");
+//             })
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Redeem request should be created with correct information", done => {
+//         instance.retrieveRedeemData.call(0).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer not correctly registered");
+//             assert.equal(_result.amount, 25000, "Amount not correctly registered");
+//             assert.equal(_result.instructions, "No particular redemption instructions", "Amount not correctly registered");
+//             assert.equal(_result.status, 0, "Status not correctly initialized");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Owner should be able to execute Redeem request", done => {
+//         instance.executeRedeemRequest(0, {from:ownerAccount}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Unsuspended", "Unsuspended event not issued");
+//             assert.equal(event1.args.account, userAccount1, "Incorrect argument in Unsuspended event");
+//             assert.equal(event1.args.value, 25000, "Incorrect argument in Unsuspended event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "Burned", "Burned event not issued");
+//             assert.equal(event2.args.account, userAccount1, "Incorrect argument in Burned event");
+//             assert.equal(event2.args.value, 25000, "Incorrect argument in Burned event");
+//             var event3 = _tx.logs[2]
+//             assert.equal(event3.event, "RedeemRequestExecuted", "RedeemRequestExecuted event not issued");
+//             assert.equal(event3.args.redeemId, 0, "Incorrect argument in RedeemRequestExecuted event");
+//             assert.equal(event3.args.redeemer, userAccount1, "Incorrect argument in RedeemRequestExecuted event");
+//         })
+//         .then(done).catch(done);
+//     });
+   
+//     it("Redeem request status should be updated after execution", done => {
+//         instance.retrieveRedeemData.call(0).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer not correctly registered");
+//             assert.equal(_result.amount, 25000, "Amount not correctly registered");
+//             assert.equal(_result.instructions, "No particular redemption instructions", "Instructions not correctly registered");
+//             assert.equal(_result.status, 1, "Status not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Funded wallet should be updated", done => {
+//         instance.balanceOf.call(userAccount1).then(_result => {
+//             assert.equal(_result, 250000-25000, "Balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Non-whitelisted users should not be able to request redemptions", done => {
+//         instance.requestRedeem(15000, "No particular instructions", {from:userAccount3}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated");
+//             instance.manyRedeemRequests.call().then(_result => {
+//                 assert.equal(_result, 1, "Redeem request added to array");
+//             })
+// })
+//         .then(done).catch(done);
+//     });
+
+//     it("(Again) Whitelisted users should be able to request redemptions", done => {
+//         instance.requestRedeem(35000, "No particular redeem instructions", {from:userAccount1}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Suspended", "Suspended event not issued");
+//             assert.equal(event1.args.account, userAccount1, "Incorrect argument in Suspended event");
+//             assert.equal(event1.args.value, 35000, "Incorrect argument in Suspended event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "RedeemRequested", "RedeemRequested event not issued");
+//             assert.equal(event2.args.redeemId, 1, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.redeemer, userAccount1, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.amount, 35000, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.instructions, "No particular redeem instructions", "Incorrect argument in RedeemRequested event");
+//             instance.manyRedeemRequests.call().then(_result => {
+//                 assert.equal(_result, 2, "Redeem request not registered into array");
+//             })
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("(Again) Redeem request should be created with correct information", done => {
+//         instance.retrieveRedeemData.call(1).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer not correctly registered");
+//             assert.equal(_result.amount, 35000, "Amount not correctly registered");
+//             assert.equal(_result.instructions, "No particular redeem instructions", "Amount not correctly registered");
+//             assert.equal(_result.status, 0, "Status not correctly initialized");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Owner should be able to reject Redeem request", done => {
+//         instance.rejectRedeemRequest(1, "No particular reason", {from:ownerAccount}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Unsuspended", "Unsuspended event not issued");
+//             assert.equal(event1.args.account, userAccount1, "Incorrect argument in Unsuspended event");
+//             assert.equal(event1.args.value, 35000, "Incorrect argument in Unsuspended event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "RedeemRequestRejected", "RedeemRequestReject event not issued");
+//             assert.equal(event2.args.redeemId, 1, "Incorrect argument in RedeemRequestRejected event");
+//             assert.equal(event2.args.redeemer, userAccount1, "Incorrect argument in RedeemRequestRejected event");
+//             assert.equal(event2.args.reason, "No particular reason", "Incorrect reason for rejection")
+//         })
+//         .then(done).catch(done);
+//     });
+   
+//     it("Redeem request status should be updated after execution", done => {
+//         instance.retrieveRedeemData.call(1).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer not correctly registered");
+//             assert.equal(_result.amount, 35000, "Amount not correctly registered");
+//             assert.equal(_result.instructions, "No particular redeem instructions", "Instructions not correctly registered");
+//             assert.equal(_result.status, 2, "Status not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Funded wallet should not be changed", done => {
+//         instance.balanceOf.call(userAccount1).then(_result => {
+//             assert.equal(_result, 250000-25000, "Balance changed");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Closed (executed) Redeem request should not be able to be re-executed", done => {
+//         instance.executeRedeemRequest(0, {from:ownerAccount}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated");
+//             instance.retrieveRedeemData.call(0).then(_result => {
+//                 assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//                 assert.equal(_result.amount, 25000, "Amount changed");
+//                 assert.equal(_result.instructions, "No particular redemption instructions", "Instructions changed");
+//                 assert.equal(_result.status, 1, "Status changed");
+//             })
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Closed (executed) Redeem request should not be able to be rejected", done => {
+//         instance.rejectRedeemRequest(0, "No particular reason", {from:ownerAccount}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated");
+//             instance.retrieveRedeemData.call(0).then(_result => {
+//                 assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//                 assert.equal(_result.amount, 25000, "Amount changed");
+//                 assert.equal(_result.instructions, "No particular redemption instructions", "Instructions changed");
+//                 assert.equal(_result.status, 1, "Status changed");
+//             })
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Closed (rejected) Redeem request should not be able to be executed", done => {
+//         instance.executeRedeemRequest(1, {from:ownerAccount}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated");
+//             instance.retrieveRedeemData.call(1).then(_result => {
+//                 assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//                 assert.equal(_result.amount, 35000, "Amount changed");
+//                 assert.equal(_result.instructions, "No particular redeem instructions", "Instructions changed");
+//                 assert.equal(_result.status, 2, "Status changed");
+//             })
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Closed (rejected) Redeem request should not be able to be re-rejected", done => {
+//         instance.rejectRedeemRequest(1, "No reason", {from:ownerAccount}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated");
+//             instance.retrieveRedeemData.call(1).then(_result => {
+//                 assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//                 assert.equal(_result.amount, 35000, "Amount changed");
+//                 assert.equal(_result.instructions, "No particular redeem instructions", "Instructions changed");
+//                 assert.equal(_result.status, 2, "Status changed");
+//             })
+//         })
+//         .then(done).catch(done);
+//     });
+    
+//     it("(Again again) Whitelisted users should be able to request redemptions", done => {
+//         instance.requestRedeem(20000, "Some instructions", {from:userAccount1}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Suspended", "Suspended event not issued");
+//             assert.equal(event1.args.account, userAccount1, "Incorrect argument in Suspended event");
+//             assert.equal(event1.args.value, 20000, "Incorrect argument in Suspended event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "RedeemRequested", "RedeemRequested event not issued");
+//             assert.equal(event2.args.redeemId, 2, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.redeemer, userAccount1, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.amount, 20000, "Incorrect argument in RedeemRequested event");
+//             assert.equal(event2.args.instructions, "Some instructions", "Incorrect argument in RedeemRequested event");
+//             instance.manyRedeemRequests.call().then(_result => {
+//                 assert.equal(_result, 3, "Redeem request not registered into array");
+//             })
+//             instance.retrieveRedeemData.call(2).then(_result => {
+//                 assert.equal(_result.redeemer, userAccount1, "Redeemer not correctly registered");
+//                 assert.equal(_result.amount, 20000, "Amount not correctly registered");
+//                 assert.equal(_result.instructions, "Some instructions", "Amount not correctly registered");
+//                 assert.equal(_result.status, 0, "Status not correctly initialized");
+//             })
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Non owner should not be able to execute redemptions", done => {
+//         instance.executeRedeemRequest(2, {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Failed execution attempts should not be registered", done => {
+//         instance.retrieveRedeemData.call(2).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//             assert.equal(_result.amount, 20000, "Amount changed");
+//             assert.equal(_result.instructions, "Some instructions", "Instructions changed");
+//             assert.equal(_result.status, 0, "Status changed");
+//         })
+//     .then(done).catch(done);
+//     });
+
+//     it("Non owner should not be able to reject redemptions", done => {
+//         instance.rejectRedeemRequest(2, "Blah blah", {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Failed reject requests should not be registered", done => {
+//         instance.retrieveRedeemData.call(2).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//             assert.equal(_result.amount, 20000, "Amount changed");
+//             assert.equal(_result.instructions, "Some instructions", "Instructions changed");
+//             assert.equal(_result.status, 0, "Status changed");
+//         })
+//     .then(done).catch(done);
+//     });
+
+//     it("User should not be able to cancel others' Redeem requests", done => {
+//         instance.cancelRedeemRequest(2, {from:userAccount2}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was generated")
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Failed cancelling attempts should not modify others' Redeem requests", done => {
+//         instance.retrieveRedeemData.call(2).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//             assert.equal(_result.amount, 20000, "Amount changed");
+//             assert.equal(_result.instructions, "Some instructions", "Instructions changed");
+//             assert.equal(_result.status, 0, "Status changed");
+//         })
+//     .then(done).catch(done);
+//     });
+
+//     it("User should be able to cancel his own Redeem requests", done => {
+//         instance.cancelRedeemRequest(2, {from:userAccount1}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Unsuspended", "Unsuspended event not issued");
+//             assert.equal(event1.args.account, userAccount1, "Incorrect argument in Unsuspended event");
+//             assert.equal(event1.args.value, 20000, "Incorrect argument in Unsuspended event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "RedeemRequestCancelled", "RedeemRequestReject event not issued");
+//             assert.equal(event2.args.redeemId, 2, "Incorrect argument in RedeemRequestCancelled event");
+//             assert.equal(event2.args.redeemer, userAccount1, "Incorrect argument in RedeemRequestCancelled event")
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Cancelling a Redeem request should be correctly registered", done => {
+//         instance.retrieveRedeemData.call(2).then(_result => {
+//             assert.equal(_result.redeemer, userAccount1, "Redeemer changed");
+//             assert.equal(_result.amount, 20000, "Amount changed");
+//             assert.equal(_result.instructions, "Some instructions", "Instructions changed");
+//             assert.equal(_result.status, 3, "Status not correctly changed");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     // Now testing direct writes to wallets
+
+//     it("Owner should be able to directly add funds to a whitelisted wallet", done => {
+//         instance.directAddToWallet(userAccount2, 220000, {from:ownerAccount}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Minted", "Minted event not issued");
+//             assert.equal(event1.args.account, userAccount2, "Incorrect argument in Minted event");
+//             assert.equal(event1.args.value, 220000, "Incorrect argument in Minted event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "DirectAddToWallet", "DirectAddToWallet event not issued");
+//             assert.equal(event2.args.account, userAccount2, "Incorrect account argument in DirectAddToWallet event")
+//             assert.equal(event2.args.value, 220000, "Incorrect value argument in DirectAddToWallet event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Owner should be able to directly remove funds to a whitelisted wallet", done => {
+//         instance.directRemoveFromWallet(userAccount2, 40000, {from:ownerAccount}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Burned", "Burned event not issued");
+//             assert.equal(event1.args.account, userAccount2, "Incorrect argument in Burned event");
+//             assert.equal(event1.args.value, 40000, "Incorrect argument in Burned event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "DirectRemoveFromWallet", "DirectRemoveFromWallet event not issued");
+//             assert.equal(event2.args.account, userAccount2, "Incorrect account argument in DirectRemoveFromWallet event")
+//             assert.equal(event2.args.value, 40000, "Incorrect value argument in DirectRemoveFromWallet event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balance should be correctly updated after direct adds and removes", done => {
+//         instance.balanceOf.call(userAccount2).then(_result => {
+//             assert.equal(_result, 220000-40000, "Balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("totalSupply should be correctly updated", done => {
+//         instance.totalSupply.call().then(_result => {
+//             assert.equal(_result, 250000-25000 + 220000-40000, "Total supply not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Owner should be able to directly set the balance of a whitelisted wallet", done => {
+//         instance.directSetWalletBalance(userAccount2, 150000, {from:ownerAccount}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Burned", "Burned event not issued");
+//             assert.equal(event1.args.account, userAccount2, "Incorrect argument in Burned event");
+//             assert.equal(event1.args.value, 220000-40000, "Incorrect argument in Burned event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "Minted", "Minted event not issued");
+//             assert.equal(event2.args.account, userAccount2, "Incorrect argument in Minted event");
+//             assert.equal(event2.args.value, 150000, "Incorrect argument in Minted event");
+//             var event3 = _tx.logs[2]
+//             assert.equal(event3.event, "DirectSetWalletBalance", "DirectSetWalletBalance event not issued");
+//             assert.equal(event3.args.account, userAccount2, "Incorrect account argument in DirectSetWalletBalance event")
+//             assert.equal(event3.args.value, 150000, "Incorrect value argument in DirectSetWalletBalance event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balance should be correctly updated after direct balance set", done => {
+//         instance.balanceOf.call(userAccount2).then(_result => {
+//             assert.equal(_result, 150000, "Balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("totalSupply should be correctly updated", done => {
+//         instance.totalSupply.call().then(_result => {
+//             assert.equal(_result, 250000-25000 + 150000, "Total supply not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Owner should be able to directly add funds even to a non whitelisted wallet", done => {
+//         instance.directAddToWallet(userAccount3, 100000, {from:ownerAccount}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Minted", "Minted event not issued");
+//             assert.equal(event1.args.account, userAccount3, "Incorrect argument in Minted event");
+//             assert.equal(event1.args.value, 100000, "Incorrect argument in Minted event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "DirectAddToWallet", "DirectAddToWallet event not issued");
+//             assert.equal(event2.args.account, userAccount3, "Incorrect account argument in DirectAddToWallet event")
+//             assert.equal(event2.args.value, 100000, "Incorrect value argument in DirectAddToWallet event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balance should be correctly updated after direct add, even to a non whitelisted wallet", done => {
+//         instance.balanceOf.call(userAccount3).then(_result => {
+//             assert.equal(_result, 100000, "Balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("totalSupply should be correctly updated", done => {
+//         instance.totalSupply.call().then(_result => {
+//             assert.equal(_result, 250000-25000 + 150000 + 100000, "Total supply not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Owner should be able to directly set the balance of a non whitelisted wallet", done => {
+//         instance.directSetWalletBalance(userAccount3, 0, {from:ownerAccount}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Burned", "Burned event not issued");
+//             assert.equal(event1.args.account, userAccount3, "Incorrect argument in Burned event");
+//             assert.equal(event1.args.value, 100000, "Incorrect argument in Burned event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "Minted", "Minted event not issued");
+//             assert.equal(event2.args.account, userAccount3, "Incorrect argument in Minted event");
+//             assert.equal(event2.args.value, 0, "Incorrect argument in Minted event");
+//             var event3 = _tx.logs[2]
+//             assert.equal(event3.event, "DirectSetWalletBalance", "DirectSetWalletBalance event not issued");
+//             assert.equal(event3.args.account, userAccount3, "Incorrect account argument in DirectSetWalletBalance event")
+//             assert.equal(event3.args.value, 0, "Incorrect value argument in DirectSetWalletBalance event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balance should be correctly updated after direct balance set", done => {
+//         instance.balanceOf.call(userAccount3).then(_result => {
+//             assert.equal(_result, 0, "Balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("totalSupply should be correctly updated", done => {
+//         instance.totalSupply.call().then(_result => {
+//             assert.equal(_result, 250000-25000 + 150000, "Total supply not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Non owner should not be able to directly add funds to a wallet", done => {
+//         instance.directAddToWallet(userAccount1, 50000, {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was sent");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Non owner should not be able to directly remove funds from a wallet", done => {
+//         instance.directRemoveFromWallet(userAccount1, 20000, {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was sent");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balance should be not change after failed direct add or remove attempts", done => {
+//         instance.balanceOf.call(userAccount1).then(_result => {
+//             assert.equal(_result, 250000-25000, "Balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Non owner should not be able to directly add funds to a wallet", done => {
+//         instance.directSetWalletBalance(userAccount1, 90000, {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was sent");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balance should be not change after failed direct balance set attempts", done => {
+//         instance.balanceOf.call(userAccount1).then(_result => {
+//             assert.equal(_result, 250000-25000, "Balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     // Now testing transfers etc.
+
+//     it("Whitelisted user should be able to transfer funds to other whitelisted users", done => {
+//         instance.transfer(userAccount2, 3000, {from:userAccount1}).then(_tx => {
+//             var event = _tx.logs[0]
+//             assert.equal(event.event, "Transfer", "Transfer event not issued");
+//             assert.equal(event.args.from, userAccount1, "Incorrect from account argument in Transfer event")
+//             assert.equal(event.args.to, userAccount2, "Incorrect to account argument in Transfer event")
+//             assert.equal(event.args.value, 3000, "Incorrect value argument in Transfer event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Whitelisted user should not be able to transfer funds to non whitelisted users", done => {
+//         instance.transfer(userAccount3, 2000, {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "An event was sent");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balances should be correctly updated after transfers", done => {
+//         instance.balanceOf.call(userAccount1).then(_result => {
+//             assert.equal(_result, 250000-25000-3000, "Sender balance not updated");
+//         })
+//         instance.balanceOf.call(userAccount2).then(_result => {
+//             assert.equal(_result, 150000+3000, "Receiver balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("totalSupply should not change after transfers", done => {
+//         instance.totalSupply.call().then(_result => {
+//             assert.equal(_result, 250000-25000 + 150000, "Total supply not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Whitelisted user should be able to approve another whitelisted users", done => {
+//         instance.approve(userAccount2, 5000, {from:userAccount1}).then(_tx => {
+//             var event = _tx.logs[0]
+//             assert.equal(event.event, "Approval", "Approval event not issued");
+//             assert.equal(event.args.owner, userAccount1, "Incorrect owner account argument in Approval event")
+//             assert.equal(event.args.spender, userAccount2, "Incorrect spender account argument in Approval event")
+//             assert.equal(event.args.value, 5000, "Incorrect value argument in Approval event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Whitelisted user should be able to increase allowance for whitelisted users", done => {
+//         instance.increaseAllowance(userAccount2, 3000, {from:userAccount1}).then(_tx => {
+//             var event = _tx.logs[0]
+//             assert.equal(event.event, "Approval", "Approval event not issued");
+//             assert.equal(event.args.owner, userAccount1, "Incorrect owner account argument in Approval event")
+//             assert.equal(event.args.spender, userAccount2, "Incorrect spender account argument in Approval event")
+//             assert.equal(event.args.value, 5000+3000, "Incorrect value argument in Approval event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Whitelisted user should be able to decrease allowance for whitelisted users", done => {
+//         instance.decreaseAllowance(userAccount2, 1000, {from:userAccount1}).then(_tx => {
+//             var event = _tx.logs[0]
+//             assert.equal(event.event, "Approval", "Approval event not issued");
+//             assert.equal(event.args.owner, userAccount1, "Incorrect ownder account argument in Approval event")
+//             assert.equal(event.args.spender, userAccount2, "Incorrect spender account argument in Approval event")
+//             assert.equal(event.args.value, 5000+3000-1000, "Incorrect value argument in Approval event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Allowances should be correctly updated after approvals", done => {
+//         instance.allowance.call(userAccount1, userAccount2).then(_result => {
+//             assert.equal(_result, 5000+3000-1000, "Allowance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balances should not change after approvals", done => {
+//         instance.balanceOf.call(userAccount1).then(_result => {
+//             assert.equal(_result, 250000-25000-3000, "Sender balance not updated");
+//         })
+//         instance.balanceOf.call(userAccount2).then(_result => {
+//             assert.equal(_result, 150000+3000, "Receiver balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Allowed spender should be able to spend within the allowance", done => {
+//         instance.transferFrom(userAccount1, userAccount2, 4000, {from:userAccount2}).then(_tx => {
+//             var event1 = _tx.logs[0]
+//             assert.equal(event1.event, "Transfer", "Transfer event not issued");
+//             assert.equal(event1.args.from, userAccount1, "Incorrect from account argument in Transfer event")
+//             assert.equal(event1.args.to, userAccount2, "Incorrect to account argument in Transfer event")
+//             assert.equal(event1.args.value, 4000, "Incorrect value argument in Transfer event");
+//             var event2 = _tx.logs[1]
+//             assert.equal(event2.event, "Approval", "Approval event not issued");
+//             assert.equal(event2.args.owner, userAccount1, "Incorrect from account argument in Approval event")
+//             assert.equal(event2.args.spender, userAccount2, "Incorrect to account argument in Approval event")
+//             assert.equal(event2.args.value, 5000+3000-1000-4000, "Incorrect value argument in Approval event");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Allowed spender should be not able to spend outside the allowance", done => {
+//         instance.transferFrom(userAccount1, userAccount2, 10000, {from:userAccount2}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "And event was sent");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Allowances should be correctly updated after spending", done => {
+//         instance.allowance.call(userAccount1, userAccount2).then(_result => {
+//             assert.equal(_result, 5000+3000-1000-4000, "Allowance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Whitelisted user should not be able to approve non whitelisted users", done => {
+//         instance.approve(userAccount3, 5000, {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "And event was sent");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Whitelisted user should not be able to increase allowance for whitelisted users", done => {
+//         instance.increaseAllowance(userAccount3, 3000, {from:userAccount1}).then(_tx => {
+//             assert.equal(_tx.logs.length, 0, "And event was sent");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("No allowance should be set for non whitelisted users after attempts", done => {
+//         instance.allowance.call(userAccount1, userAccount3).then(_result => {
+//             assert.equal(_result, 0, "Allowance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("Wallet balances should be correctly updated after transferFrom's", done => {
+//         instance.balanceOf.call(userAccount1).then(_result => {
+//             assert.equal(_result, 250000-25000-3000-4000, "Sender balance not updated");
+//         })
+//         instance.balanceOf.call(userAccount2).then(_result => {
+//             assert.equal(_result, 150000+3000+4000, "Receiver balance not updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+//     it("totalSupply should not change after transferFrom's", done => {
+//         instance.totalSupply.call().then(_result => {
+//             assert.equal(_result, 250000-25000 + 150000, "Total supply not correctly updated");
+//         })
+//         .then(done).catch(done);
+//     });
+
+});

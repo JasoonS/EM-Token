@@ -6,16 +6,16 @@ interface IClearable {
 
     event ClearableTransferOrdered(
         address indexed orderer,
-        string indexed operationId,
+        string operationId,
         address fromWallet,
         address toWallet,
         uint256 amount
     );
 
-    event ClearableTransferInProcess(address indexed orderer, string indexed operationId);
-    event ClearableTransferExecuted(address indexed orderer, string indexed operationId);
-    event ClearableTransferRejected(address indexed orderer, string indexed operationId, string reason);
-    event ClearableTransferCancelled(address indexed orderer, string indexed operationId);
+    event ClearableTransferInProcess(address indexed orderer, string operationId);
+    event ClearableTransferExecuted(address indexed orderer, string operationId);
+    event ClearableTransferRejected(address indexed orderer, string operationId, string reason);
+    event ClearableTransferCancelled(address indexed orderer, string operationId);
     event ApprovalToOrderClearableTransfer(address indexed wallet, address indexed orderer);
     event RevokeApprovalToOrderClearableTransfer(address indexed wallet, address indexed orderer);
 

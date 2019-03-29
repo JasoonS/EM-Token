@@ -6,17 +6,17 @@ interface IPayoutable {
 
     event PayoutOrdered(
         address indexed orderer,
-        string indexed operationId,
+        string operationId,
         address indexed walletToDebit,
         uint256 amount,
         string instructions
     );
 
-    event PayoutInProcess(address indexed orderer, string indexed operationId);
-    event PayoutFundsInSuspense(address indexed orderer, string indexed operationId);
-    event PayoutExecuted(address indexed orderer, string indexed operationId);
-    event PayoutRejected(address indexed orderer, string indexed operationId, string reason);
-    event PayoutCancelled(address indexed orderer, string indexed operationId);
+    event PayoutInProcess(address indexed orderer, string operationId);
+    event PayoutFundsInSuspense(address indexed orderer, string operationId);
+    event PayoutExecuted(address indexed orderer, string operationId);
+    event PayoutRejected(address indexed orderer, string operationId, string reason);
+    event PayoutCancelled(address indexed orderer, string operationId);
     event ApprovalToOrderPayout(address indexed walletToDebit, address indexed orderer);
     event RevokeApprovalToOrderPayout(address indexed walletToDebit, address indexed orderer);
 

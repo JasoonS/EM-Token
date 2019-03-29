@@ -324,17 +324,18 @@ contract Holdable is IHoldable, Compliant {
         holdDoesNotExist(holder, operationId)
         returns (bool)
     {
-        require(amount >= _availableFunds(from), "Not enough funds to hold");
+        require(amount <= _availableFunds(from), "Not enough funds to hold");
         uint256 expiration = block.timestamp.add(timeToExpiration);
         _addBalanceOnHold(from, amount);
         emit HoldCreated(holder, operationId, from, to, notary, amount, expires, expiration);
         return
             _setHoldFrom(holder, operationId, from) &&
-            _setHoldFrom(holder, operationId, to) &&
+            _setHoldTo(holder, operationId, to) &&
             _setHoldNotary(holder, operationId, notary) &&
             _setHoldAmount(holder, operationId, amount) &&
             _setHoldExpires(holder, operationId, expires) &&
-            _setHoldExpiration(holder, operationId, expiration);
+            _setHoldExpiration(holder, operationId, expiration) &&
+            _setHoldStatus(holder, operationId, HoldStatusCode.Ordered);
     }
 
     function _finalizeHold(

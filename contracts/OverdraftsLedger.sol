@@ -30,8 +30,8 @@ contract OverdraftsLedger is EternalStorageConnector {
      * @dev 
      */
     bytes32 constant private _UNSECURED_OVERDRAFT_LIMITS = "_unsecuredOverdraftsLimits";
-    bytes32 constant private _DRAWN_AMOUNTS = "_drawnAmounts";
-    bytes32 constant private _TOTAL_DRAWN_AMOUNTS = "_totalDrawnAmounts";
+    bytes32 constant private _OVERDRAFTS_DRAWN = "_overdraftsDrawn";
+    bytes32 constant private _TOTAL_OVERDRAFT_DRAWN = "_totalOverdraftDrawn";
 
     // Events
 
@@ -81,19 +81,19 @@ contract OverdraftsLedger is EternalStorageConnector {
     }
 
     function _getDrawnAmount(address wallet) private view returns (uint256) {
-        return whichEternalStorage().getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet);
+        return whichEternalStorage().getUintFromAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _OVERDRAFTS_DRAWN, wallet);
     }
 
     function _setDrawnAmounts(address wallet, uint256 value) private returns (bool) {
-        return whichEternalStorage().setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, wallet, value);
+        return whichEternalStorage().setUintInAddressMapping(OVERDRAFTSLEDGER_CONTRACT_NAME, _OVERDRAFTS_DRAWN, wallet, value);
     }
 
     function _getTotalDrawnAmount() private view returns (uint256) {
-        return whichEternalStorage().getUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS);
+        return whichEternalStorage().getUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _TOTAL_OVERDRAFT_DRAWN);
     }
 
     function _setTotalDrawnAmount(uint256 value) private returns (bool) {
-        return whichEternalStorage().setUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _DRAWN_AMOUNTS, value);
+        return whichEternalStorage().setUint(OVERDRAFTSLEDGER_CONTRACT_NAME, _TOTAL_OVERDRAFT_DRAWN, value);
     }
 
 }

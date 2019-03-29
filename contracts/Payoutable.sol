@@ -30,11 +30,11 @@ contract Payoutable is IPayoutable, Holdable {
      * @dev _PAYOUT_APPROVALS : mapping (address => mapping (address => bool)) storing the permissions for addresses
      * to request payouts on behalf of wallets
      */
-    bytes32 constant private _WALLETS_TO_DEBIT =    "_walletsToDebit";
-    bytes32 constant private _PAYOUT_AMOUNTS =      "_payoutAmounts";
-    bytes32 constant private _PAYOUT_INSTRUCTIONS = "_payoutInstructions";
-    bytes32 constant private _PAYOUT_STATUS_CODES = "_payoutStatusCodes";
-    bytes32 constant private _PAYOUT_APPROVALS =    "_payoutApprovals";
+    bytes32 constant private _PAYOUT_WALLETS_TO_DEBIT =    "_payoutWalletsToDebit";
+    bytes32 constant private _PAYOUT_AMOUNTS =             "_payoutAmounts";
+    bytes32 constant private _PAYOUT_INSTRUCTIONS =        "_payoutInstructions";
+    bytes32 constant private _PAYOUT_STATUS_CODES =        "_payoutStatusCodes";
+    bytes32 constant private _PAYOUT_APPROVALS =           "_payoutApprovals";
 
     // Modifiers
 
@@ -136,6 +136,7 @@ contract Payoutable is IPayoutable, Holdable {
     {
         address orderer = msg.sender;
         _finalizeHold(orderer, operationId, HoldStatusCode.ReleasedByNotary);
+        emit HoldReleased(orderer, operationId, HoldStatusCode.ReleasedByNotary);
         emit PayoutCancelled(orderer, operationId);
         return _setPayoutStatus(orderer, operationId, PayoutStatusCode.Cancelled);
     }
@@ -156,7 +157,7 @@ contract Payoutable is IPayoutable, Holdable {
      * 
      */
     function processPayout(address orderer, string calldata operationId) external
-        payoutInStatus(msg.sender, operationId, PayoutStatusCode.Ordered)
+        payoutInStatus(orderer, operationId, PayoutStatusCode.Ordered)
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
@@ -188,6 +189,7 @@ contract Payoutable is IPayoutable, Holdable {
         _removeFunds(walletToDebit, amount);
         _increaseBalance(SUSPENSE_WALLET, amount);
         _finalizeHold(orderer, operationId, HoldStatusCode.ExecutedByNotary);
+        emit HoldExecuted(orderer, operationId, HoldStatusCode.ExecutedByNotary);
         emit PayoutFundsInSuspense(orderer, operationId);
         return _setPayoutStatus(orderer, operationId, PayoutStatusCode.FundsInSuspense);
     }
@@ -204,7 +206,7 @@ contract Payoutable is IPayoutable, Holdable {
      * 
      */
     function executePayout(address orderer, string calldata operationId) external
-        payoutInStatus(msg.sender, operationId, PayoutStatusCode.FundsInSuspense)
+        payoutInStatus(orderer, operationId, PayoutStatusCode.FundsInSuspense)
         returns (bool)
     {
         requireRole(OPERATOR_ROLE);
@@ -232,6 +234,7 @@ contract Payoutable is IPayoutable, Holdable {
         PayoutStatusCode status = _getPayoutStatus(orderer, operationId);
         require(status == PayoutStatusCode.Ordered || status == PayoutStatusCode.InProcess, "Payout request cannot be rejected");
         _finalizeHold(orderer, operationId, HoldStatusCode.ReleasedByNotary);
+        emit HoldReleased(orderer, operationId, HoldStatusCode.ReleasedByNotary);
         emit PayoutRejected(orderer, operationId, reason);
         return _setPayoutStatus(orderer, operationId, PayoutStatusCode.Rejected);
     }
@@ -291,8 +294,8 @@ contract Payoutable is IPayoutable, Holdable {
         payoutDoesNotExist(orderer, operationId)
         returns (bool)
     {
-        require(amount >= _availableFunds(walletToDebit), "Not enough funds to ask for payout");
-        _createHold(orderer, operationId, walletToDebit, SUSPENSE_WALLET, address(0), amount, false, 0); // No notary or status, as this is going to be managed by the methods
+        require(amount <= _availableFunds(walletToDebit), "Not enough funds to ask for payout");
+        _createHold(orderer, operationId, walletToDebit, SUSPENSE_WALLET, address(0), amount, false, 0); // No notary, as this is going to be managed by the methods
         emit PayoutOrdered(orderer, operationId, walletToDebit, amount, instructions);
         return
             _setWalletToDebit(orderer, operationId, walletToDebit) &&
@@ -308,11 +311,11 @@ contract Payoutable is IPayoutable, Holdable {
     // Private functions wrapping access to eternal storage
 
     function _getWalletToDebit(address orderer, string memory operationId) private view returns (address walletToDebit) {
-        walletToDebit = whichEternalStorage().getAddressFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, orderer, operationId);
+        walletToDebit = whichEternalStorage().getAddressFromDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_WALLETS_TO_DEBIT, orderer, operationId);
     }
 
     function _setWalletToDebit(address orderer, string memory operationId, address walletToDebit) private returns (bool) {
-        return whichEternalStorage().setAddressInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _WALLETS_TO_DEBIT, orderer, operationId, walletToDebit);
+        return whichEternalStorage().setAddressInDoubleAddressStringMapping(PAYOUTABLE_CONTRACT_NAME, _PAYOUT_WALLETS_TO_DEBIT, orderer, operationId, walletToDebit);
     }
 
     function _getPayoutAmount(address orderer, string memory operationId) private view returns (uint256 amount) {

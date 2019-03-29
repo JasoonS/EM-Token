@@ -15,7 +15,7 @@ interface IHoldable {
 
     event HoldCreated(
         address indexed holder,
-        string  indexed operationId,
+        string  operationId,
         address from,
         address to,
         address indexed notary,
@@ -24,9 +24,9 @@ interface IHoldable {
         uint256 expiration
     ); // By holder (which can be the payer as well)
 
-    event HoldExecuted(address indexed holder, string indexed operationId, HoldStatusCode status); // By notary or by operator
-    event HoldReleased(address indexed holder, string indexed operationId, HoldStatusCode status); // By notary, by payee, by operator, or due to expiration
-    event HoldRenewed(address indexed holder, string indexed operationId, uint256 oldExpiration, uint256 newExpiration); // By holder
+    event HoldExecuted(address indexed holder, string operationId, HoldStatusCode status); // By notary or by operator
+    event HoldReleased(address indexed holder, string operationId, HoldStatusCode status); // By notary, by payee, by operator, or due to expiration
+    event HoldRenewed(address indexed holder, string operationId, uint256 oldExpiration, uint256 newExpiration); // By holder
     event ApprovalToHold(address indexed wallet, address indexed holder);
     event RevokeApprovalToHold(address indexed wallet, address indexed holder);
 
