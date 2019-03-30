@@ -64,10 +64,12 @@ contract("EMoneyToken", accounts => {
     // Check compliance aspects of payouts
 
     it("Compliance check functions for payouts should work", async () => {
-        assert.equal(await instance.canOrderPayout.call(userAccount1, userAccount1, 0), SUCCESS, "Requesting payouts from whitelisted address is not compliant");
-        assert.equal(await instance.canOrderPayout.call(userAccount1, notWhilisted1, 0), FAILURE, "Requesting payouts from non whitelisted address passess compliance check");
+        assert.equal(await instance.canOrderPayout.call(userAccount1, userAccount1, 10), SUCCESS, "Requesting payouts from whitelisted address is not compliant");
+        assert.equal(await instance.canOrderPayout.call(userAccount1, notWhilisted1, 10), FAILURE, "Requesting payouts from non whitelisted address passess compliance check");
+        assert.equal(await instance.canOrderPayout.call(notWhilisted1, userAccount1, 10), FAILURE, "Requesting payouts from non whitelisted address passess compliance check");
         assert.equal(await instance.canApproveToOrderPayout.call(userAccount2, userAccount3), SUCCESS, "Approving a whitelisted address is not compliant");
         assert.equal(await instance.canApproveToOrderPayout.call(userAccount2, notWhilisted2), FAILURE, "Approving a non whitelisted address passes compliance check");
+        assert.equal(await instance.canApproveToOrderPayout.call(notWhilisted2, userAccount2), FAILURE, "Approving a non whitelisted address passes compliance check");
     })
 
     // Checking payout process

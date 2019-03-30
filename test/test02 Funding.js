@@ -43,8 +43,8 @@ contract("EMoneyToken", accounts => {
     // Check compliance aspects of funding
 
     it("Compliance check functions for funding should work", async () => {
-        assert.equal(await instance.canOrderFunding.call(userAccount1, userAccount1, 0), SUCCESS, "Requesting funding from whitelisted address is not compliant");
-        assert.equal(await instance.canOrderFunding.call(userAccount1, notWhilisted1, 0), FAILURE, "Requesting funding from non whitelisted address passess compliance check");
+        assert.equal(await instance.canOrderFunding.call(userAccount1, userAccount1, 10), SUCCESS, "Requesting funding from whitelisted address is not compliant");
+        assert.equal(await instance.canOrderFunding.call(userAccount1, notWhilisted1, 10), FAILURE, "Requesting funding from non whitelisted address passess compliance check");
         assert.equal(await instance.canApproveToOrderFunding.call(userAccount2, userAccount3), SUCCESS, "Approving a whitelisted address is not compliant");
         assert.equal(await instance.canApproveToOrderFunding.call(userAccount2, notWhilisted2), FAILURE, "Approving a non whitelisted address passes compliance check");
     })

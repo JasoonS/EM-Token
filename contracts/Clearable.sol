@@ -105,7 +105,7 @@ contract Clearable is IClearable, Holdable {
         address orderer = msg.sender;
         address from = msg.sender;
         _check(_canOrderClearableTransfer, from, to, amount);
-        return _createClearableTransferRequest(orderer, operationId, from, to, amount);
+        return _createClearableTransfer(orderer, operationId, from, to, amount);
     }
 
     /**
@@ -129,7 +129,7 @@ contract Clearable is IClearable, Holdable {
         address orderer = msg.sender;
         require(orderer == from || _isApprovedToOrderClearableTransfer(from, orderer), "Not approved to order clearable transfers");
         _check(_canOrderClearableTransfer, from, to, amount);
-        return _createClearableTransferRequest(orderer, operationId, from, to, amount);
+        return _createClearableTransfer(orderer, operationId, from, to, amount);
     }
 
     /**
@@ -139,7 +139,7 @@ contract Clearable is IClearable, Holdable {
      * @dev Only the original orderer can actually cancel an outstanding clerable transfer
      */
     function cancelClearableTransfer(string calldata operationId) external
-        clearableTransferNotClosed(msg.sender, operationId)
+        clearableTransferJustCreated(msg.sender, operationId)
         returns (bool)
     {
         address orderer = msg.sender;
@@ -187,8 +187,8 @@ contract Clearable is IClearable, Holdable {
         address from = _getClearableTransferFrom(orderer, operationId);
         address to = _getClearableTransferTo(orderer, operationId);
         uint256 amount = _getClearableTransferAmount(orderer, operationId);
-        _decreaseBalance(from, amount);
-        _increaseBalance(to, amount);
+        _removeFunds(from, amount);
+        _addFunds(to, amount);
         _finalizeHold(orderer, operationId, HoldStatusCode.ExecutedByNotary);
         emit HoldExecuted(orderer, operationId, HoldStatusCode.ExecutedByNotary);
         emit ClearableTransferExecuted(orderer, operationId);
@@ -265,7 +265,7 @@ contract Clearable is IClearable, Holdable {
 
     // Internal functions
 
-    function _createClearableTransferRequest(
+    function _createClearableTransfer(
         address orderer,
         string memory operationId,
         address from,

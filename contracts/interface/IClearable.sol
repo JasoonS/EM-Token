@@ -7,8 +7,8 @@ interface IClearable {
     event ClearableTransferOrdered(
         address indexed orderer,
         string operationId,
-        address fromWallet,
-        address toWallet,
+        address from,
+        address to,
         uint256 amount
     );
 
