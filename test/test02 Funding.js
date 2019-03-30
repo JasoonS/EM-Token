@@ -309,7 +309,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.status, FundingStatusCode.Rejected, "Status not correctly updated");
     });
 
-    it("Whitelisted but non approved user should not be able to request funding on behalf of others", async () => {
+    it("Non whitelisted users should be able to be approved to request funding on behalf of others", async () => {
         await truffleAssert.reverts(instance.approveToOrderFunding(notWhilisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
     });
 

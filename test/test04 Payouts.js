@@ -425,12 +425,21 @@ contract("EMoneyToken", accounts => {
     });
 
     it("Executed payout and associated hold should be correctly reflected", async () => {
-        assert.equal(await instance.doesPayoutExist.call(userAccount2, PAYOUT_ID3), true, "Cancelled payout request does not exist");
+        assert.equal(await instance.doesPayoutExist.call(userAccount2, PAYOUT_ID3), true, "Executed payout request does not exist");
         _result = await instance.retrievePayoutData.call(userAccount2, PAYOUT_ID3);
         assert.equal(_result.walletToDebit, userAccount2, "walletToDebit not correctly registered");
         assert.equal(_result.amount, 255000, "Amount not correctly registered");
         assert.equal(_result.instructions, "Send it to my bank account please 3", "Instructions not correctly registered");
         assert.equal(_result.status, PayoutStatusCode.Executed, "Status not correctly updated");
+
+        assert.equal(await instance.doesHoldExist.call(userAccount2, PAYOUT_ID3), true, "Hold associated to executed payout request does not exist");
+        _result = await instance.retrieveHoldData.call(userAccount2, PAYOUT_ID3);
+        assert.equal(_result.from, userAccount2, "From not correctly registered");
+        assert.equal(_result.to, SUSPENSE_WALLET, "To not correctly registered");
+        assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
+        assert.equal(_result.amount, 255000, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.status, HoldStatusCode.ExecutedByNotary, "Status not correctly initialized");
     });
 
     it("Executed payout request should not be able to be reordered, cancelled, processed, executed or rejected", async () => {
@@ -455,156 +464,294 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
     });
 
+    it("Nobody should be able to request payouts beyond their available balances", async () => {
+        truffleAssert.reverts(instance.orderPayout(PAYOUT_ID4, 50000-1000+1, "Whatever", {from:userAccount1}), "", "Was able to request payout");
+        truffleAssert.reverts(instance.orderPayout(PAYOUT_ID4, 20000+1, "Whatever", {from:userAccount2}), "", "Was able to request payout");
+        await truffleAssert.reverts(instance.orderPayout(PAYOUT_ID4, 350000+1, "Whatever", {from:userAccount3}), "", "Was able to request payout");
+    });
 
-    // it("(Again 3) Whitelisted users should be able to request payout", async () => {
-    //     tx = await instance.orderPayout(PAYOUT_ID4, 100000, "No particular instructions 4", {from:userAccount1});
-    //     assert.equal(tx.logs[0].event, "PayoutOrdered", "PayoutOrdered event not issued");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.operationId, PAYOUT_ID4, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.walletToDebit, userAccount1, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.amount,100000, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.instructions, "No particular instructions 4", "Incorrect argument in PayoutOrdered event");
-    // });
+    it("(Again 3) Whitelisted users should be able to request payout", async () => {
+        tx = await instance.orderPayout(PAYOUT_ID4, 100000, "No particular instructions 4", {from:userAccount3});
 
-    // it("(Again 3) Just ordered payout request should be correctly stored", async () => {
-    //     assert.equal(await instance.doesPayoutExist.call(userAccount1, PAYOUT_ID4), true, "Submitted payout request does not exist");
-    //     _result = await instance.retrievePayoutData.call(userAccount1, PAYOUT_ID4);
-    //     assert.equal(_result.walletToDebit, userAccount1, "walletToDebit not correctly registered");
-    //     assert.equal(_result.amount, 100000, "Amount not correctly registered");
-    //     assert.equal(_result.instructions, "No particular instructions 4", "Amount not correctly registered");
-    //     assert.equal(_result.status, PayoutStatusCode.Ordered, "Status not correctly initialized");
-    // });
+        assert.equal(tx.logs[0].event, "HoldCreated", "HoldCreated event not issued");
+        assert.equal(tx.logs[0].args.holder, userAccount3, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.operationId, PAYOUT_ID4, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.from, userAccount3, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.to, SUSPENSE_WALLET, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.notary, ZERO_ADDRESS, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.amount, 100000, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.expires, false, "Incorrect argument in HoldCreated event");
 
-    // it("(Again 3) Operator should be able to put a payout request in process", async () => {
-    //     tx = await instance.processPayout(userAccount1, PAYOUT_ID4, {from:operator});
-    //     assert.equal(tx.logs[0].event, "PayoutInProcess", "PayoutInProcess event not issued");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in PayoutInProcess event");
-    //     assert.equal(tx.logs[0].args.operationId, PAYOUT_ID4, "Incorrect argument in PayoutInProcess event");
-    // });
+        assert.equal(tx.logs[1].event, "PayoutOrdered", "PayoutOrdered event not issued");
+        assert.equal(tx.logs[1].args.orderer, userAccount3, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.operationId, PAYOUT_ID4, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.walletToDebit, userAccount3, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.amount,100000, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.instructions, "No particular instructions 4", "Incorrect argument in PayoutOrdered event");
+    });
 
-    // it("Operator should be able to reject a payout request in process", async () => {
-    //     tx = await instance.rejectPayout(userAccount1, PAYOUT_ID4, "No real reason", {from:operator});
-    //     assert.equal(tx.logs[0].event, "PayoutRejected", "PayoutRejected event not issued");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in PayoutRejected event");
-    //     assert.equal(tx.logs[0].args.operationId, PAYOUT_ID4, "Incorrect argument in PayoutRejected event");
-    //     assert.equal(tx.logs[0].args.reason, "No real reason", "Incorrect argument in PayoutRejected event");
-    // });
+    it("(Again 3) Just ordered payout request should be correctly stored", async () => {
+        assert.equal(await instance.doesPayoutExist.call(userAccount3, PAYOUT_ID4), true, "Submitted payout request does not exist");
+        _result = await instance.retrievePayoutData.call(userAccount3, PAYOUT_ID4);
+        assert.equal(_result.walletToDebit, userAccount3, "walletToDebit not correctly registered");
+        assert.equal(_result.amount, 100000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 4", "Amount not correctly registered");
+        assert.equal(_result.status, PayoutStatusCode.Ordered, "Status not correctly initialized");
+    });
 
-    // it("Executed payout request should be correctly reflected", async () => {
-    //     assert.equal(await instance.doesPayoutExist.call(userAccount1, PAYOUT_ID4), true, "Cancelled payout request does not exist");
-    //     _result = await instance.retrievePayoutData.call(userAccount1, PAYOUT_ID4);
-    //     assert.equal(_result.walletToDebit, userAccount1, "walletToDebit not correctly registered");
-    //     assert.equal(_result.amount, 100000, "Amount not correctly registered");
-    //     assert.equal(_result.instructions, "No particular instructions 4", "Instructions not correctly registered");
-    //     assert.equal(_result.status, PayoutStatusCode.Rejected, "Status not correctly updated");
-    // });
+    it("(Again 3) Operator should be able to put a payout request in process", async () => {
+        tx = await instance.processPayout(userAccount3, PAYOUT_ID4, {from:operator});
+        assert.equal(tx.logs[0].event, "PayoutInProcess", "PayoutInProcess event not issued");
+        assert.equal(tx.logs[0].args.orderer, userAccount3, "Incorrect argument in PayoutInProcess event");
+        assert.equal(tx.logs[0].args.operationId, PAYOUT_ID4, "Incorrect argument in PayoutInProcess event");
+    });
 
-    // it("(Again 4) Whitelisted users should be able to request payout", async () => {
-    //     tx = await instance.orderPayout(PAYOUT_ID1, 100000, "No particular instructions 5", {from:userAccount2});
-    //     assert.equal(tx.logs[0].event, "PayoutOrdered", "PayoutOrdered event not issued");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount2, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.operationId, PAYOUT_ID1, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.walletToDebit, userAccount2, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.amount,100000, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.instructions, "No particular instructions 5", "Incorrect argument in PayoutOrdered event");
-    // });
+    it("Operator should be able to reject a payout request in process", async () => {
+        tx = await instance.rejectPayout(userAccount3, PAYOUT_ID4, "No real reason", {from:operator});
 
-    // it("(Again 4) Just ordered payout request should be correctly stored", async () => {
-    //     assert.equal(await instance.doesPayoutExist.call(userAccount2, PAYOUT_ID1), true, "Submitted payout request does not exist");
-    //     _result = await instance.retrievePayoutData.call(userAccount2, PAYOUT_ID1);
-    //     assert.equal(_result.walletToDebit, userAccount2, "walletToDebit not correctly registered");
-    //     assert.equal(_result.amount, 100000, "Amount not correctly registered");
-    //     assert.equal(_result.instructions, "No particular instructions 5", "Amount not correctly registered");
-    //     assert.equal(_result.status, PayoutStatusCode.Ordered, "Status not correctly initialized");
-    // });
+        assert.equal(tx.logs[0].event, "HoldReleased", "HoldReleased event not issued");
+        assert.equal(tx.logs[0].args.holder, userAccount3, "Incorrect argument in HoldReleased event");
+        assert.equal(tx.logs[0].args.operationId, PAYOUT_ID4, "Incorrect argument in HoldReleased event");
+        assert.equal(tx.logs[0].args.status, HoldStatusCode.ReleasedByNotary, "Incorrect argument in PayoutCancelled event");
 
-    // it("Operator should be able to reject a payout request just ordered", async () => {
-    //     tx = await instance.rejectPayout(userAccount2, PAYOUT_ID1, "No real reason", {from:operator});
-    //     assert.equal(tx.logs[0].event, "PayoutRejected", "PayoutRejected event not issued");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount2, "Incorrect argument in PayoutRejected event");
-    //     assert.equal(tx.logs[0].args.operationId, PAYOUT_ID1, "Incorrect argument in PayoutRejected event");
-    //     assert.equal(tx.logs[0].args.reason, "No real reason", "Incorrect argument in PayoutRejected event");
-    // });
+        assert.equal(tx.logs[1].event, "PayoutRejected", "PayoutRejected event not issued");
+        assert.equal(tx.logs[1].args.orderer, userAccount3, "Incorrect argument in PayoutRejected event");
+        assert.equal(tx.logs[1].args.operationId, PAYOUT_ID4, "Incorrect argument in PayoutRejected event");
+        assert.equal(tx.logs[1].args.reason, "No real reason", "Incorrect argument in PayoutRejected event");
+    });
 
-    // it("Executed payout request should be correctly reflected", async () => {
-    //     assert.equal(await instance.doesPayoutExist.call(userAccount2, PAYOUT_ID1), true, "Cancelled payout request does not exist");
-    //     _result = await instance.retrievePayoutData.call(userAccount2, PAYOUT_ID1);
-    //     assert.equal(_result.walletToDebit, userAccount2, "walletToDebit not correctly registered");
-    //     assert.equal(_result.amount, 100000, "Amount not correctly registered");
-    //     assert.equal(_result.instructions, "No particular instructions 5", "Instructions not correctly registered");
-    //     assert.equal(_result.status, PayoutStatusCode.Rejected, "Status not correctly updated");
-    // });
+    it("Executed payout request should be correctly reflected", async () => {
+        assert.equal(await instance.doesPayoutExist.call(userAccount3, PAYOUT_ID4), true, "Cancelled payout request does not exist");
+        _result = await instance.retrievePayoutData.call(userAccount3, PAYOUT_ID4);
+        assert.equal(_result.walletToDebit, userAccount3, "walletToDebit not correctly registered");
+        assert.equal(_result.amount, 100000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 4", "Instructions not correctly registered");
+        assert.equal(_result.status, PayoutStatusCode.Rejected, "Status not correctly updated");
+    });
 
-    // it("Whitelisted but non approved user should not be able to request payout on behalf of others", async () => {
-    //     await truffleAssert.reverts(instance.approveToOrderPayout(notWhilisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
-    // });
+    it("Balances and limits should be correctly registered after rejecting payout", async () => {
+        assert.equal(await instance.balanceOf.call(userAccount3), 350000, "Balance not correctly registered");
+        assert.equal(await instance.drawnAmount.call(userAccount3), 0, "Drawn amount not correctly registered");
+        assert.equal(await instance.netBalanceOf.call(userAccount3), 350000, "Net balance not correctly registered");
+        assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount3), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount3), 0, "Wrong balance on hold");
+        assert.equal(await instance.availableFunds.call(userAccount3), 350000, "Available funds not correctly registered");
 
-    // it("Whitelisted user should be able to approve a whitelisted user to be able to request payout", async () => {
-    //     tx = await instance.approveToOrderPayout(userAccount1, {from:userAccount2});
-    //     assert.equal(tx.logs[0].event, "ApprovalToOrderPayout", "ApprovalToOrderPayout event not issued");
-    //     assert.equal(tx.logs[0].args.walletToDebit, userAccount2, "Incorrect argument in ApprovalToOrderPayout event");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in ApprovalToOrderPayout event");
-    // });
+        assert.equal(await instance.balanceOf.call(SUSPENSE_WALLET), 0, "Balance in suspense wallet not correctly registered");
 
-    // it("Approvals should be correctly reflected", async () => {
-    //     assert.equal(await instance.isApprovedToOrderPayout.call(userAccount2, userAccount1), true, "Wrong approval");
-    //     assert.equal(await instance.isApprovedToOrderPayout.call(userAccount1, userAccount2), false, "Wrong approval");
-    //     assert.equal(await instance.isApprovedToOrderPayout.call(userAccount1, userAccount3), false, "Wrong approval");
-    // });
+        assert.equal(await instance.totalSupply.call(), 350000, "Total suuply not correctly registered");
+        assert.equal(await instance.totalDrawnAmount.call(), 6000, "Total drawn amount not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+    });
 
-    // it("Approved users should be able to request payout on behalf of others", async () => {
-    //     tx = await instance.orderPayoutFrom(PAYOUT_ID3, userAccount2, 200000, "No particular instructions 6", {from:userAccount1})
-    //     assert.equal(tx.logs[0].event, "PayoutOrdered", "PayoutOrdered event not issued");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.operationId, PAYOUT_ID3, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.walletToDebit, userAccount2, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.amount,200000, "Incorrect argument in PayoutOrdered event");
-    //     assert.equal(tx.logs[0].args.instructions, "No particular instructions 6", "Incorrect argument in PayoutOrdered event");
-    // });
+    it("(Again 4) Whitelisted users should be able to request payout", async () => {
+        tx = await instance.orderPayout(PAYOUT_ID5, 1000, "No particular instructions 5", {from:userAccount2});
 
-    // it("Just ordered payout request should be correctly stored", async () => {
-    //     assert.equal(await instance.doesPayoutExist.call(userAccount1, PAYOUT_ID3), true, "Submitted payout request does not exist");
-    //     _result = await instance.retrievePayoutData.call(userAccount1, PAYOUT_ID3);
-    //     assert.equal(_result.walletToDebit, userAccount2, "walletToDebit not correctly registered");
-    //     assert.equal(_result.amount, 200000, "Amount not correctly registered");
-    //     assert.equal(_result.instructions, "No particular instructions 6", "Amount not correctly registered");
-    //     assert.equal(_result.status, PayoutStatusCode.Ordered, "Status not correctly initialized");
-    // });
+        assert.equal(tx.logs[0].event, "HoldCreated", "HoldCreated event not issued");
+        assert.equal(tx.logs[0].args.holder, userAccount2, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.operationId, PAYOUT_ID5, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.from, userAccount2, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.to, SUSPENSE_WALLET, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.notary, ZERO_ADDRESS, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.amount, 1000, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.expires, false, "Incorrect argument in HoldCreated event");
 
-    // it("No one other than orderer should be able to cancel a payout request", async () => {
-    //     truffleAssert.reverts(instance.cancelPayout(PAYOUT_ID3, {from:userAccount2}), "", "Was able to cancel payout");
-    //     truffleAssert.reverts(instance.cancelPayout(PAYOUT_ID3, {from:owner}), "", "Was able to cancel payout");
-    //     await truffleAssert.reverts(instance.cancelPayout(PAYOUT_ID3, {from:operator}), "", "Was able to cancel payout");
-    // });
+        assert.equal(tx.logs[1].event, "PayoutOrdered", "PayoutOrdered event not issued");
+        assert.equal(tx.logs[1].args.orderer, userAccount2, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.operationId, PAYOUT_ID5, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.walletToDebit, userAccount2, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.amount,1000, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.instructions, "No particular instructions 5", "Incorrect argument in PayoutOrdered event");
+    });
 
-    // it("Operator should be able to execute a payout request just ordered", async () => {
-    //     tx = await instance.executePayout(userAccount1, PAYOUT_ID3, {from:operator});
-    //     assert.equal(tx.logs[0].event, "BalanceIncrease", "BalanceIncrease event not issued");
-    //     assert.equal(tx.logs[0].args.wallet, userAccount2, "Incorrect argument in BalanceIncrease event");
-    //     assert.equal(tx.logs[0].args.value, 200000, "Incorrect argument in BalanceIncrease event");
-    //     assert.equal(tx.logs[1].event, "PayoutExecuted", "PayoutExecuted event not issued");
-    //     assert.equal(tx.logs[1].args.orderer, userAccount1, "Incorrect argument in PayoutExecuted event");
-    //     assert.equal(tx.logs[1].args.operationId, PAYOUT_ID3, "Incorrect argument in PayoutExecuted event");
-    // });
+    it("(Again 4) Just ordered payout request should be correctly stored", async () => {
+        assert.equal(await instance.doesPayoutExist.call(userAccount2, PAYOUT_ID5), true, "Submitted payout request does not exist");
+        _result = await instance.retrievePayoutData.call(userAccount2, PAYOUT_ID5);
+        assert.equal(_result.walletToDebit, userAccount2, "walletToDebit not correctly registered");
+        assert.equal(_result.amount, 1000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 5", "Amount not correctly registered");
+        assert.equal(_result.status, PayoutStatusCode.Ordered, "Status not correctly initialized");
+    });
 
-    // it("Executed payout request should be correctly reflected", async () => {
-    //     assert.equal(await instance.doesPayoutExist.call(userAccount1, PAYOUT_ID3), true, "Cancelled payout request does not exist");
-    //     _result = await instance.retrievePayoutData.call(userAccount1, PAYOUT_ID3);
-    //     assert.equal(_result.walletToDebit, userAccount2, "walletToDebit not correctly registered");
-    //     assert.equal(_result.amount, 200000, "Amount not correctly registered");
-    //     assert.equal(_result.instructions, "No particular instructions 6", "Instructions not correctly registered");
-    //     assert.equal(_result.status, PayoutStatusCode.Executed, "Status not correctly updated");
-    // });
+    it("Operator should be able to reject a payout request just ordered", async () => {
+        tx = await instance.rejectPayout(userAccount2, PAYOUT_ID5, "No real reason", {from:operator});
 
-    // it("User shold be able to revoke previously approved users to request payout", async () => {
-    //     tx = await instance.revokeApprovalToOrderPayout(userAccount1, {from:userAccount2});
-    //     assert.equal(tx.logs[0].event, "RevokeApprovalToOrderPayout", "RevokeApprovalToOrderPayout event not issued");
-    //     assert.equal(tx.logs[0].args.walletToDebit, userAccount2, "Incorrect argument in RevokeApprovalToOrderPayout event");
-    //     assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in ApprovalToOrderPayout event");
-    // });
+        assert.equal(tx.logs[0].event, "HoldReleased", "HoldReleased event not issued");
+        assert.equal(tx.logs[0].args.holder, userAccount2, "Incorrect argument in HoldReleased event");
+        assert.equal(tx.logs[0].args.operationId, PAYOUT_ID5, "Incorrect argument in HoldReleased event");
+        assert.equal(tx.logs[0].args.status, HoldStatusCode.ReleasedByNotary, "Incorrect argument in PayoutCancelled event");
 
-    // it("Whitelisted but non approved user should not be able to request payout on behalf of others", async () => {
-    //     await truffleAssert.reverts(instance.orderPayoutFrom(PAYOUT_ID5, userAccount2, 10000, "Some instructions", {from:userAccount1}), "", "Was able to order payout on behalf of others");
-    // });
+        assert.equal(tx.logs[1].event, "PayoutRejected", "PayoutRejected event not issued");
+        assert.equal(tx.logs[1].args.orderer, userAccount2, "Incorrect argument in PayoutRejected event");
+        assert.equal(tx.logs[1].args.operationId, PAYOUT_ID5, "Incorrect argument in PayoutRejected event");
+        assert.equal(tx.logs[1].args.reason, "No real reason", "Incorrect argument in PayoutRejected event");
+    });
+
+    it("Executed payout request should be correctly reflected", async () => {
+        assert.equal(await instance.doesPayoutExist.call(userAccount2, PAYOUT_ID5), true, "Cancelled payout request does not exist");
+        _result = await instance.retrievePayoutData.call(userAccount2, PAYOUT_ID5);
+        assert.equal(_result.walletToDebit, userAccount2, "walletToDebit not correctly registered");
+        assert.equal(_result.amount, 1000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 5", "Instructions not correctly registered");
+        assert.equal(_result.status, PayoutStatusCode.Rejected, "Status not correctly updated");
+    });
+
+    it("Balances and limits should be correctly registered after executing payout", async () => {
+        assert.equal(await instance.balanceOf.call(userAccount2), 0, "Balance not correctly registered");
+        assert.equal(await instance.drawnAmount.call(userAccount2), 5000, "Drawn amount not correctly registered");
+        assert.equal(await instance.netBalanceOf.call(userAccount2), -5000, "Net balance not correctly registered");
+        assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount2), 25000, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount2), 0, "Wrong balance on hold");
+        assert.equal(await instance.availableFunds.call(userAccount2), 20000, "Available funds not correctly registered");
+
+        assert.equal(await instance.balanceOf.call(SUSPENSE_WALLET), 0, "Balance in suspense wallet not correctly registered");
+
+        assert.equal(await instance.totalSupply.call(), 350000, "Total suuply not correctly registered");
+        assert.equal(await instance.totalDrawnAmount.call(), 6000, "Total drawn amount not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+    });
+
+    it("Non whitelisted users should be able to be approved to request funding on behalf of others", async () => {
+        await truffleAssert.reverts(instance.approveToOrderPayout(notWhilisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
+    });
+
+    it("Whitelisted user should be able to approve a whitelisted user to be able to request payout", async () => {
+        tx = await instance.approveToOrderPayout(userAccount1, {from:userAccount3});
+        assert.equal(tx.logs[0].event, "ApprovalToOrderPayout", "ApprovalToOrderPayout event not issued");
+        assert.equal(tx.logs[0].args.walletToDebit, userAccount3, "Incorrect argument in ApprovalToOrderPayout event");
+        assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in ApprovalToOrderPayout event");
+    });
+
+    it("Approvals should be correctly reflected", async () => {
+        assert.equal(await instance.isApprovedToOrderPayout.call(userAccount3, userAccount1), true, "Wrong approval");
+        assert.equal(await instance.isApprovedToOrderPayout.call(userAccount1, userAccount2), false, "Wrong approval");
+        assert.equal(await instance.isApprovedToOrderPayout.call(userAccount1, userAccount3), false, "Wrong approval");
+    });
+
+    it("Approved users should be able to request payout on behalf of others", async () => {
+        tx = await instance.orderPayoutFrom(PAYOUT_ID3, userAccount3, 200000, "No particular instructions 6", {from:userAccount1})
+
+        assert.equal(tx.logs[0].event, "HoldCreated", "HoldCreated event not issued");
+        assert.equal(tx.logs[0].args.holder, userAccount1, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.operationId, PAYOUT_ID3, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.from, userAccount3, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.to, SUSPENSE_WALLET, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.notary, ZERO_ADDRESS, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.amount, 200000, "Incorrect argument in HoldCreated event");
+        assert.equal(tx.logs[0].args.expires, false, "Incorrect argument in HoldCreated event");
+
+        assert.equal(tx.logs[1].event, "PayoutOrdered", "PayoutOrdered event not issued");
+        assert.equal(tx.logs[1].args.orderer, userAccount1, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.operationId, PAYOUT_ID3, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.walletToDebit, userAccount3, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.amount,200000, "Incorrect argument in PayoutOrdered event");
+        assert.equal(tx.logs[1].args.instructions, "No particular instructions 6", "Incorrect argument in PayoutOrdered event");
+    });
+
+    it("Just ordered payout request should be correctly stored", async () => {
+        assert.equal(await instance.doesPayoutExist.call(userAccount1, PAYOUT_ID3), true, "Submitted payout request does not exist");
+        _result = await instance.retrievePayoutData.call(userAccount1, PAYOUT_ID3);
+        assert.equal(_result.walletToDebit, userAccount3, "walletToDebit not correctly registered");
+        assert.equal(_result.amount, 200000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 6", "Amount not correctly registered");
+        assert.equal(_result.status, PayoutStatusCode.Ordered, "Status not correctly initialized");
+    });
+
+    it("No one other than orderer should be able to cancel a payout request", async () => {
+        truffleAssert.reverts(instance.cancelPayout(PAYOUT_ID3, {from:userAccount3}), "", "Was able to cancel payout");
+        truffleAssert.reverts(instance.cancelPayout(PAYOUT_ID3, {from:owner}), "", "Was able to cancel payout");
+        await truffleAssert.reverts(instance.cancelPayout(PAYOUT_ID3, {from:operator}), "", "Was able to cancel payout");
+    });
+
+    it("Operator should be able to put funds in suspense and execute a payout request just ordered", async () => {
+        tx = await instance.putFundsInSuspenseInPayout(userAccount1, PAYOUT_ID3, {from:operator});
+
+        assert.equal(tx.logs[0].event, "BalanceDecrease", "BalanceDecrease event not issued");
+        assert.equal(tx.logs[0].args.wallet, userAccount3, "Incorrect argument in BalanceDecrease event");
+        assert.equal(tx.logs[0].args.value, 200000, "Incorrect argument in BalanceDecrease event");
+
+        assert.equal(tx.logs[1].event, "BalanceIncrease", "BalanceIncrease event not issued");
+        assert.equal(tx.logs[1].args.wallet, SUSPENSE_WALLET, "Incorrect argument in BalanceIncrease event");
+        assert.equal(tx.logs[1].args.value, 200000, "Incorrect argument in BalanceIncrease event");
+
+        assert.equal(tx.logs[2].event, "HoldExecuted", "HoldExecuted event not issued");
+        assert.equal(tx.logs[2].args.holder, userAccount1, "Incorrect argument in HoldExecuted event");
+        assert.equal(tx.logs[2].args.operationId, PAYOUT_ID3, "Incorrect argument in HoldExecuted event");
+        assert.equal(tx.logs[2].args.status, HoldStatusCode.ExecutedByNotary, "Incorrect argument in HoldExecuted event");
+
+        assert.equal(tx.logs[3].event, "PayoutFundsInSuspense", "PayoutFundsInSuspense event not issued");
+        assert.equal(tx.logs[3].args.orderer, userAccount1, "Incorrect argument in PayoutFundsInSuspense event");
+        assert.equal(tx.logs[3].args.operationId, PAYOUT_ID3, "Incorrect argument in PayoutFundsInSuspense event");
+
+        tx = await instance.executePayout(userAccount1, PAYOUT_ID3, {from:operator});
+
+        assert.equal(tx.logs[0].event, "BalanceDecrease", "BalanceIncrease event not issued");
+        assert.equal(tx.logs[0].args.wallet, SUSPENSE_WALLET, "Incorrect argument in BalanceIncrease event");
+        assert.equal(tx.logs[0].args.value, 200000, "Incorrect argument in BalanceIncrease event");
+
+        assert.equal(tx.logs[1].event, "PayoutExecuted", "PayoutExecuted event not issued");
+        assert.equal(tx.logs[1].args.orderer, userAccount1, "Incorrect argument in PayoutExecuted event");
+        assert.equal(tx.logs[1].args.operationId, PAYOUT_ID3, "Incorrect argument in PayoutExecuted event");
+    });
+
+    it("Executed payout and associated hold should be correctly reflected", async () => {
+        assert.equal(await instance.doesPayoutExist.call(userAccount1, PAYOUT_ID3), true, "Executed payout request does not exist");
+        _result = await instance.retrievePayoutData.call(userAccount1, PAYOUT_ID3);
+        assert.equal(_result.walletToDebit, userAccount3, "walletToDebit not correctly registered");
+        assert.equal(_result.amount, 200000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 6", "Instructions not correctly registered");
+        assert.equal(_result.status, PayoutStatusCode.Executed, "Status not correctly updated");
+
+        assert.equal(await instance.doesHoldExist.call(userAccount1, PAYOUT_ID3), true, "Hold associated to executed payout request does not exist");
+        _result = await instance.retrieveHoldData.call(userAccount1, PAYOUT_ID3);
+        assert.equal(_result.from, userAccount3, "From not correctly registered");
+        assert.equal(_result.to, SUSPENSE_WALLET, "To not correctly registered");
+        assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
+        assert.equal(_result.amount, 200000, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.status, HoldStatusCode.ExecutedByNotary, "Status not correctly recorded");
+    });
+
+    it("User shold be able to revoke previously approved users to request payout", async () => {
+        tx = await instance.revokeApprovalToOrderPayout(userAccount1, {from:userAccount3});
+        assert.equal(tx.logs[0].event, "RevokeApprovalToOrderPayout", "RevokeApprovalToOrderPayout event not issued");
+        assert.equal(tx.logs[0].args.walletToDebit, userAccount3, "Incorrect argument in RevokeApprovalToOrderPayout event");
+        assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in ApprovalToOrderPayout event");
+    });
+
+    it("Whitelisted but non approved user should not be able to request payout on behalf of others", async () => {
+        truffleAssert.reverts(instance.orderPayoutFrom(PAYOUT_ID5, userAccount3, 100, "Some instructions", {from:userAccount1}), "", "Was able to order payout on behalf of others");
+        truffleAssert.reverts(instance.orderPayoutFrom(PAYOUT_ID5, userAccount2, 100, "Some instructions", {from:userAccount1}), "", "Was able to order payout on behalf of others");
+        await truffleAssert.reverts(instance.orderPayoutFrom(PAYOUT_ID2, userAccount1, 10000, "Some instructions", {from:userAccount2}), "", "Was able to order payout on behalf of others");
+    });
+
+    it("Balances and limits should be correctly registered", async () => {
+        assert.equal(await instance.balanceOf.call(userAccount1), 0, "Balance not correctly registered");
+        assert.equal(await instance.drawnAmount.call(userAccount1), 1000, "Drawn amount not correctly registered");
+        assert.equal(await instance.netBalanceOf.call(userAccount1), -1000, "Net balance not correctly registered");
+        assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.availableFunds.call(userAccount1), 50000-1000, "Available funds not correctly registered");
+        
+        assert.equal(await instance.balanceOf.call(userAccount2), 0, "Balance not correctly registered");
+        assert.equal(await instance.drawnAmount.call(userAccount2), 5000, "Drawn amount not correctly registered");
+        assert.equal(await instance.netBalanceOf.call(userAccount2), -5000, "Net balance not correctly registered");
+        assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount2), 25000, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount2), 0, "Wrong balance on hold");
+        assert.equal(await instance.availableFunds.call(userAccount2), 20000, "Available funds not correctly registered");
+        
+        assert.equal(await instance.balanceOf.call(userAccount3), 150000, "Balance not correctly registered");
+        assert.equal(await instance.drawnAmount.call(userAccount3), 0, "Drawn amount not correctly registered");
+        assert.equal(await instance.netBalanceOf.call(userAccount3), 150000, "Net balance not correctly registered");
+        assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount3), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount3), 0, "Wrong balance on hold");
+        assert.equal(await instance.availableFunds.call(userAccount3), 150000, "Available funds not correctly registered");
+
+        assert.equal(await instance.balanceOf.call(SUSPENSE_WALLET), 0, "Balance in suspense wallet not correctly registered");
+
+        assert.equal(await instance.totalSupply.call(), 150000, "Total suuply not correctly registered");
+        assert.equal(await instance.totalDrawnAmount.call(), 6000, "Total drawn amount not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+    })
 
 });
