@@ -33,6 +33,7 @@ contract("EMoneyToken", accounts => {
     const FUNDING_ID3 = "FundingID3"
     const FUNDING_ID4 = "FundingID4"
     const FUNDING_ID5 = "FundingID5"
+    const FUNDING_ID6 = "FundingID6"
     
     before( async () => {
         console.log("  > Now testing funding processes");
@@ -51,6 +52,8 @@ contract("EMoneyToken", accounts => {
 
     // Checking funding process
     
+    // Transaction #1, will be cancelled by orderer
+
     it("Should provide working workflows for funding requests", async () => {
         assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID1), false, "Not submitted funding request seems to exist");
 
@@ -116,6 +119,8 @@ contract("EMoneyToken", accounts => {
         truffleAssert.reverts(instance.executeFunding(userAccount1, FUNDING_ID1, {from:operator}), "", "Was able to cancel funding");
         await truffleAssert.reverts(instance.rejectFunding(userAccount1, FUNDING_ID1, "No reason", {from:operator}), "", "Was able to cancel funding");
     });
+
+    // Transaction #2, will be put in process and executed
 
     it("(Again) Whitelisted users should be able to request funding", async () => {
         tx = await instance.orderFunding(FUNDING_ID2, 150000, "No particular instructions 2", {from:userAccount2});
@@ -184,6 +189,8 @@ contract("EMoneyToken", accounts => {
         await truffleAssert.reverts(instance.rejectFunding(userAccount2, FUNDING_ID2, "No reason", {from:operator}), "", "Was able to cancel funding");
     });
 
+    // Transaction #3, will be executed
+
     it("(Again 2) Whitelisted users should be able to request funding", async () => {
         tx = await instance.orderFunding(FUNDING_ID3, 350000, "No particular instructions 3", {from:userAccount3});
         assert.equal(tx.logs[0].event, "FundingOrdered", "FundingOrdered event not issued");
@@ -230,6 +237,8 @@ contract("EMoneyToken", accounts => {
         await truffleAssert.reverts(instance.rejectFunding(userAccount3, FUNDING_ID3, "No reason", {from:operator}), "", "Was able to cancel funding");
     });
 
+    // Transaction #4, will be put in process and rejected
+
     it("(Again 3) Whitelisted users should be able to request funding", async () => {
         tx = await instance.orderFunding(FUNDING_ID4, 100000, "No particular instructions 4", {from:userAccount1});
         assert.equal(tx.logs[0].event, "FundingOrdered", "FundingOrdered event not issued");
@@ -264,7 +273,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(tx.logs[0].args.reason, "No real reason", "Incorrect argument in FundingRejected event");
     });
 
-    it("Executed funding request should be correctly reflected", async () => {
+    it("Rejected funding request should be correctly reflected", async () => {
         assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID4), true, "Cancelled funding request does not exist");
         _result = await instance.retrieveFundingData.call(userAccount1, FUNDING_ID4);
         assert.equal(_result.walletToFund, userAccount1, "walletToFund not correctly registered");
@@ -272,6 +281,8 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.instructions, "No particular instructions 4", "Instructions not correctly registered");
         assert.equal(_result.status, FundingStatusCode.Rejected, "Status not correctly updated");
     });
+
+    // Transaction #5, will be directly rejected
 
     it("(Again 4) Whitelisted users should be able to request funding", async () => {
         tx = await instance.orderFunding(FUNDING_ID1, 100000, "No particular instructions 5", {from:userAccount2});
@@ -300,7 +311,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(tx.logs[0].args.reason, "No real reason", "Incorrect argument in FundingRejected event");
     });
 
-    it("Executed funding request should be correctly reflected", async () => {
+    it("Rejected funding request should be correctly reflected", async () => {
         assert.equal(await instance.doesFundingExist.call(userAccount2, FUNDING_ID1), true, "Cancelled funding request does not exist");
         _result = await instance.retrieveFundingData.call(userAccount2, FUNDING_ID1);
         assert.equal(_result.walletToFund, userAccount2, "walletToFund not correctly registered");
@@ -309,7 +320,9 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.status, FundingStatusCode.Rejected, "Status not correctly updated");
     });
 
-    it("Non whitelisted users should be able to be approved to request funding on behalf of others", async () => {
+    // Transaction #6, will be ordered through orderFundingFrom and cancelled
+
+    it("Non whitelisted users should not be able to be approved to request funding on behalf of others", async () => {
         await truffleAssert.reverts(instance.approveToOrderFunding(notWhilisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
     });
 
@@ -327,6 +340,49 @@ contract("EMoneyToken", accounts => {
     });
 
     it("Approved users should be able to request funding on behalf of others", async () => {
+        tx = await instance.orderFundingFrom(FUNDING_ID2, userAccount2, 100000, "No particular instructions 6", {from:userAccount1})
+        assert.equal(tx.logs[0].event, "FundingOrdered", "FundingOrdered event not issued");
+        assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.operationId, FUNDING_ID2, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.walletToFund, userAccount2, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.amount,100000, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.instructions, "No particular instructions 6", "Incorrect argument in FundingOrdered event");
+    });
+
+    it("Just ordered funding request should be correctly stored", async () => {
+        assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID2), true, "Submitted funding request does not exist");
+        _result = await instance.retrieveFundingData.call(userAccount1, FUNDING_ID2);
+        assert.equal(_result.walletToFund, userAccount2, "walletToFund not correctly registered");
+        assert.equal(_result.amount, 100000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 6", "Amount not correctly registered");
+        assert.equal(_result.status, FundingStatusCode.Ordered, "Status not correctly initialized");
+    });
+
+    it("No one other than orderer should be able to cancel a funding request", async () => {
+        truffleAssert.reverts(instance.cancelFunding(FUNDING_ID2, {from:userAccount2}), "", "Was able to cancel funding");
+        truffleAssert.reverts(instance.cancelFunding(FUNDING_ID2, {from:owner}), "", "Was able to cancel funding");
+        await truffleAssert.reverts(instance.cancelFunding(FUNDING_ID2, {from:operator}), "", "Was able to cancel funding");
+    });
+
+    it("Orderer should be able to cancel a funding request just ordered", async () => {
+        tx = await instance.cancelFunding(FUNDING_ID2, {from:userAccount1});
+        assert.equal(tx.logs[0].event, "FundingCancelled", "FundingCancelled event not issued");
+        assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in FundingCancelled event");
+        assert.equal(tx.logs[0].args.operationId, FUNDING_ID2, "Incorrect argument in FundingCancelled event");
+    });
+
+    it("Cancelled funding request should be correctly reflected", async () => {
+        assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID2), true, "Cancelled funding request does not exist");
+        _result = await instance.retrieveFundingData.call(userAccount1, FUNDING_ID2);
+        assert.equal(_result.walletToFund, userAccount2, "walletToFund not correctly registered");
+        assert.equal(_result.amount, 100000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 6", "Instructions not correctly registered");
+        assert.equal(_result.status, FundingStatusCode.Cancelled, "Status not correctly updated");
+    });
+
+    // Transaction #7, will be ordered through orderFundingFrom and rejected
+
+    it("(Again) Approved users should be able to request funding on behalf of others", async () => {
         tx = await instance.orderFundingFrom(FUNDING_ID3, userAccount2, 100000, "No particular instructions 6", {from:userAccount1})
         assert.equal(tx.logs[0].event, "FundingOrdered", "FundingOrdered event not issued");
         assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in FundingOrdered event");
@@ -345,25 +401,63 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.status, FundingStatusCode.Ordered, "Status not correctly initialized");
     });
 
+    it("Operator should be able to reject a funding request just ordered", async () => {
+        tx = await instance.rejectFunding(userAccount1, FUNDING_ID3, "No particular reason", {from:operator});
+        assert.equal(tx.logs[0].event, "FundingRejected", "FundingRejected event not issued");
+        assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in FundingRejected event");
+        assert.equal(tx.logs[0].args.operationId, FUNDING_ID3, "Incorrect argument in FundingRejected event");
+        assert.equal(tx.logs[0].args.reason, "No particular reason", "Incorrect argument in FundingRejected event");
+    });
+
+    it("Rejected funding request should be correctly reflected", async () => {
+        assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID3), true, "Cancelled funding request does not exist");
+        _result = await instance.retrieveFundingData.call(userAccount1, FUNDING_ID3);
+        assert.equal(_result.walletToFund, userAccount2, "walletToFund not correctly registered");
+        assert.equal(_result.amount, 100000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 6", "Instructions not correctly registered");
+        assert.equal(_result.status, FundingStatusCode.Rejected, "Status not correctly updated");
+    });
+
+    // Transaction #8, will be ordered through orderFundingFrom and executed
+
+    it("(Again 2) Approved users should be able to request funding on behalf of others", async () => {
+        tx = await instance.orderFundingFrom(FUNDING_ID5, userAccount2, 100000, "No particular instructions 6", {from:userAccount1})
+        assert.equal(tx.logs[0].event, "FundingOrdered", "FundingOrdered event not issued");
+        assert.equal(tx.logs[0].args.orderer, userAccount1, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.operationId, FUNDING_ID5, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.walletToFund, userAccount2, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.amount,100000, "Incorrect argument in FundingOrdered event");
+        assert.equal(tx.logs[0].args.instructions, "No particular instructions 6", "Incorrect argument in FundingOrdered event");
+    });
+
+    it("Just ordered funding request should be correctly stored", async () => {
+        assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID5), true, "Submitted funding request does not exist");
+        _result = await instance.retrieveFundingData.call(userAccount1, FUNDING_ID5);
+        assert.equal(_result.walletToFund, userAccount2, "walletToFund not correctly registered");
+        assert.equal(_result.amount, 100000, "Amount not correctly registered");
+        assert.equal(_result.instructions, "No particular instructions 6", "Amount not correctly registered");
+        assert.equal(_result.status, FundingStatusCode.Ordered, "Status not correctly initialized");
+    });
+
     it("No one other than orderer should be able to cancel a funding request", async () => {
-        truffleAssert.reverts(instance.cancelFunding(FUNDING_ID3, {from:userAccount2}), "", "Was able to cancel funding");
-        truffleAssert.reverts(instance.cancelFunding(FUNDING_ID3, {from:owner}), "", "Was able to cancel funding");
-        await truffleAssert.reverts(instance.cancelFunding(FUNDING_ID3, {from:operator}), "", "Was able to cancel funding");
+        truffleAssert.reverts(instance.cancelFunding(FUNDING_ID5, {from:userAccount2}), "", "Was able to cancel funding");
+        truffleAssert.reverts(instance.cancelFunding(FUNDING_ID5, {from:owner}), "", "Was able to cancel funding");
+        await truffleAssert.reverts(instance.cancelFunding(FUNDING_ID5, {from:operator}), "", "Was able to cancel funding");
     });
 
     it("Operator should be able to execute a funding request just ordered", async () => {
-        tx = await instance.executeFunding(userAccount1, FUNDING_ID3, {from:operator});
+        tx = await instance.executeFunding(userAccount1, FUNDING_ID5, {from:operator});
         assert.equal(tx.logs[0].event, "BalanceIncrease", "BalanceIncrease event not issued");
         assert.equal(tx.logs[0].args.wallet, userAccount2, "Incorrect argument in BalanceIncrease event");
         assert.equal(tx.logs[0].args.value, 100000, "Incorrect argument in BalanceIncrease event");
         assert.equal(tx.logs[1].event, "FundingExecuted", "FundingExecuted event not issued");
         assert.equal(tx.logs[1].args.orderer, userAccount1, "Incorrect argument in FundingExecuted event");
-        assert.equal(tx.logs[1].args.operationId, FUNDING_ID3, "Incorrect argument in FundingExecuted event");
+        assert.equal(tx.logs[1].args.operationId, FUNDING_ID5, "Incorrect argument in FundingExecuted event");
     });
 
     it("Executed funding request should be correctly reflected", async () => {
-        assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID3), true, "Cancelled funding request does not exist");
-        _result = await instance.retrieveFundingData.call(userAccount1, FUNDING_ID3);
+        assert.equal(await instance.doesFundingExist.call(userAccount1, FUNDING_ID5), true, "Cancelled funding request does not exist");
+        _result = await instance.retrieveFundingData.call(userAccount1, FUNDING_ID5);
         assert.equal(_result.walletToFund, userAccount2, "walletToFund not correctly registered");
         assert.equal(_result.amount, 100000, "Amount not correctly registered");
         assert.equal(_result.instructions, "No particular instructions 6", "Instructions not correctly registered");
@@ -378,7 +472,7 @@ contract("EMoneyToken", accounts => {
     });
 
     it("Whitelisted but non approved user should not be able to request funding on behalf of others", async () => {
-        await truffleAssert.reverts(instance.orderFundingFrom(FUNDING_ID5, userAccount2, 10000, "Some instructions", {from:userAccount1}), "", "Was able to order funding on behalf of others");
+        await truffleAssert.reverts(instance.orderFundingFrom(FUNDING_ID6, userAccount2, 10000, "Some instructions", {from:userAccount1}), "", "Was able to order funding on behalf of others");
     });
 
     it("Balances should be correctly registered", async () => {
