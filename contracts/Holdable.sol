@@ -185,7 +185,7 @@ contract Holdable is IHoldable, Compliant {
             require(false, "Hold cannot be released");
         }
         emit HoldReleased(holder, operationId, finalStatus);
-        return _finalizeHold(msg.sender, operationId, finalStatus);
+        return _finalizeHold(holder, operationId, finalStatus);
     }
     
     /**

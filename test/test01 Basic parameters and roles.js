@@ -12,8 +12,8 @@ contract("EMoneyToken", accounts => {
     const userAccount2 = accounts[4]
     const userAccount3 = accounts[3]
     const notary1 = accounts[2]
-    const notWhilisted1 = accounts[1]
-    const notWhilisted2 = accounts[0]
+    const notWhitelisted1 = accounts[1]
+    const notWhitelisted2 = accounts[0]
     const SUSPENSE_WALLET = "0x0000000000000000000000000000000000000000"
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
     
@@ -217,6 +217,18 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.isRegisteredInWhitelist.call(userAccount3), true, "User not registered");
         assert.equal(await instance.indexInWhitelist.call(userAccount3), 2, "Wallet not found in array");
         assert.equal(await instance.addressInWhitelist.call(2), userAccount3, "Wallet not added correctly");
+    });
+
+    it("Compliance officer should be able to whitelist addresses (notary1)", async () => {
+        tx = await instance.whitelist(notary1, {from:compliance});
+        assert.equal(tx.logs[0].event, "Whitelisted", "Whitelisted event not issued");
+        assert.equal(tx.logs[0].args.who, notary1, "Incorrect argument in Whitelisted event");
+        assert.equal(tx.logs[0].args.index, 3, "Incorrect argument in Whitelisted event");
+        assert.equal(await instance.manyRegisteredAddresses.call(), 4, "New wallet not added to the array");
+        assert.equal(await instance.isWhitelisted.call(notary1), true, "User not whitelisted");
+        assert.equal(await instance.isRegisteredInWhitelist.call(notary1), true, "User not registered");
+        assert.equal(await instance.indexInWhitelist.call(notary1), 3, "Wallet not found in array");
+        assert.equal(await instance.addressInWhitelist.call(3), notary1, "Wallet not added correctly");
     });
 
     it("Nobody but a compliance officer should be able to unwhitelist addresses", async () => {

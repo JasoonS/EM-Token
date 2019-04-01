@@ -14,8 +14,8 @@ contract("EMoneyToken", accounts => {
     const userAccount2 = accounts[4]
     const userAccount3 = accounts[3]
     const notary1 = accounts[2]
-    const notWhilisted1 = accounts[1]
-    const notWhilisted2 = accounts[0]
+    const notWhitelisted1 = accounts[1]
+    const notWhitelisted2 = accounts[0]
     const SUSPENSE_WALLET = "0x0000000000000000000000000000000000000000"
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
     
@@ -45,9 +45,16 @@ contract("EMoneyToken", accounts => {
 
     it("Compliance check functions for funding should work", async () => {
         assert.equal(await instance.canOrderFunding.call(userAccount1, userAccount1, 10), SUCCESS, "Requesting funding from whitelisted address is not compliant");
-        assert.equal(await instance.canOrderFunding.call(userAccount1, notWhilisted1, 10), FAILURE, "Requesting funding from non whitelisted address passess compliance check");
+        assert.equal(await instance.canOrderFunding.call(userAccount1, notWhitelisted1, 10), FAILURE, "Requesting funding from non whitelisted address passess compliance check");
         assert.equal(await instance.canApproveToOrderFunding.call(userAccount2, userAccount3), SUCCESS, "Approving a whitelisted address is not compliant");
-        assert.equal(await instance.canApproveToOrderFunding.call(userAccount2, notWhilisted2), FAILURE, "Approving a non whitelisted address passes compliance check");
+        assert.equal(await instance.canApproveToOrderFunding.call(userAccount2, notWhitelisted2), FAILURE, "Approving a non whitelisted address passes compliance check");
+    })
+
+    it("Not whitelisted addresses should not be able to order funding", async () => {
+        truffleAssert.reverts(instance.orderFunding(FUNDING_ID1, 0, "No particular instructions", {from:notWhitelisted1}), "", "Was able to order funding");
+        truffleAssert.reverts(instance.orderFunding(FUNDING_ID1, 10, "No particular instructions", {from:notWhitelisted1}), "", "Was able to order funding");
+        truffleAssert.reverts(instance.approveToOrderFunding(userAccount2, {from:notWhitelisted1}), "", "A non whitelisted address was able to approve");
+        await truffleAssert.reverts(instance.approveToOrderFunding(notWhitelisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
     })
 
     // Checking funding process
@@ -321,10 +328,6 @@ contract("EMoneyToken", accounts => {
     });
 
     // Transaction #6, will be ordered through orderFundingFrom and cancelled
-
-    it("Non whitelisted users should not be able to be approved to request funding on behalf of others", async () => {
-        await truffleAssert.reverts(instance.approveToOrderFunding(notWhilisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
-    });
 
     it("Whitelisted user should be able to approve a whitelisted user to be able to request funding", async () => {
         tx = await instance.approveToOrderFunding(userAccount1, {from:userAccount2});

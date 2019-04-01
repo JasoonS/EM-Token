@@ -57,6 +57,54 @@ contract ERC20 is IERC20, Compliant {
         return _transfer(from, to, value);
     }
 
+    // External functions to be called by operators
+
+    /**
+     * @notice Method to directly mint / add tokens to a wallet. This is intended to be used in tokenization
+     * processes not initiated through the blockchain (i.e. by calling orderFunding), but through an external
+     * channel - e.g. the user directly sending a bank transfer to the omnibus account and the tokenizer
+     * consequently minting the funds into the token contract through this mint function
+     * @param to The wallet to which the funds are to be added
+     * @param referenceId An external reference associated to this mint operation, e.g. the internal tx ID
+     * of the transfer to the omnibus account
+     * @param value The amount of tokens minted
+     * @dev Note that adding funds to the wallet doesn't necessarily imply adding them to the balance, since
+     * they can also be used to reduced the drawn amount from the overdraft line
+     * @dev Only the operator can call this function
+     */
+    function mint(address to, string calldata referenceId, uint256 value) external returns (bool) {
+        requireRole(OPERATOR_ROLE);
+        emit Mint(to, referenceId, value);
+        _addFunds(to, value);
+        return true;
+    }
+
+    /**
+     * @notice Method to directly burn / remove tokens from a wallet. This is intended to be used in
+     * detokenization processes not initiated through the blockchain (i.e. by calling orderPayout), but
+     * through an external channel - e.g. the user directly asking for this in a mobile wallet or banking
+     * application of some sort.
+     * @param from The wallet from which the funds are to be removed
+     * @param referenceId An external reference associated to this burn operation, e.g. the internal tx ID
+     * of the transfer from the omnibus account
+     * @param value The amount of tokens burned
+     * @dev Note that removing funds from the wallet doesn't necessarily imply removing them from the
+     * balance, since they can also be drawn from the overdraft line if there is enough available limit
+     * @dev Only the operator can call this function
+     * @dev Note that even though this is to be called by the operator, the user is required to have enough
+     * available funds in order to support the burn operation. If this is not the case, the operator is
+     * supposed to increase the overdraft limit before burning (also, direct writes can also be done in
+     * emergency situations, as described in the ConsolidatedLedger contract)
+     */
+    function burn(address from, string calldata referenceId, uint256 value) external returns (bool) {
+        requireRole(OPERATOR_ROLE);
+        require(_availableFunds(from) >= value, "Not enough available funds to burn");
+        emit Burn(from, referenceId, value);
+        _removeFunds(from, value);
+        return true;
+    }
+
+
     // Additional (non standard) user functions
 
     /**

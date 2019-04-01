@@ -12,8 +12,8 @@ contract("EMoneyToken", accounts => {
     const userAccount2 = accounts[4]
     const userAccount3 = accounts[3]
     const notary1 = accounts[2]
-    const notWhilisted1 = accounts[1]
-    const notWhilisted2 = accounts[0]
+    const notWhitelisted1 = accounts[1]
+    const notWhitelisted2 = accounts[0]
     const SUSPENSE_WALLET = "0x0000000000000000000000000000000000000000"
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
     
@@ -94,7 +94,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 0+250000+350000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 0, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     })
 
     // TO DO: interest engines

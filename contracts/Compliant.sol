@@ -121,7 +121,8 @@ contract Compliant is ICompliant, ConsolidatedLedger, Whitelistable {
     function _canHold(address payer, address payee, address notary, uint256 value) internal view
         returns (byte status)
     {
-        if(!_isWhitelisted(payer) || !_isWhitelisted(payee) || (notary != address(0) && !_isWhitelisted(notary)) || value > MAX_VALUE) {
+        bool notaryOk = notary == address(0) || _isWhitelisted(notary);
+        if(!_isWhitelisted(payer) || !_isWhitelisted(payee) || !notaryOk || value > MAX_VALUE) {
             return FAILURE;
         } else {
             return SUCCESS;

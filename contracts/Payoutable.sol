@@ -187,7 +187,7 @@ contract Payoutable is IPayoutable, Holdable {
         address walletToDebit = _getWalletToDebit(orderer, operationId);
         uint256 amount = _getPayoutAmount(orderer, operationId);
         _removeFunds(walletToDebit, amount);
-        _increaseBalance(SUSPENSE_WALLET, amount);
+        _addFunds(SUSPENSE_WALLET, amount);
         _finalizeHold(orderer, operationId, HoldStatusCode.ExecutedByNotary);
         emit HoldExecuted(orderer, operationId, HoldStatusCode.ExecutedByNotary);
         emit PayoutFundsInSuspense(orderer, operationId);
@@ -211,7 +211,7 @@ contract Payoutable is IPayoutable, Holdable {
     {
         requireRole(OPERATOR_ROLE);
         uint256 amount = _getPayoutAmount(orderer, operationId);
-        _decreaseBalance(SUSPENSE_WALLET, amount);
+        _removeFunds(SUSPENSE_WALLET, amount);
         emit PayoutExecuted(orderer, operationId);
         return _setPayoutStatus(orderer, operationId, PayoutStatusCode.Executed);
     }

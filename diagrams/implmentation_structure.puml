@@ -46,15 +46,6 @@ class RoleControl {
 class ConsolidatedLedger {
 }
 
-class ERC20Ledger {
-}
-
-class HoldsLedger {
-}
-
-class OverdraftsLedger {
-}
-
 class EternalStorageWrapper {
 }
 
@@ -82,14 +73,7 @@ Whitelistable <|-- RoleControl
 
 Compliant <|-- ConsolidatedLedger
 
-ConsolidatedLedger <|-- ERC20Ledger
-ConsolidatedLedger <|-- HoldsLedger
-ConsolidatedLedger <|-- OverdraftsLedger
-
-
-ERC20Ledger <|-- EternalStorageWrapper
-HoldsLedger <|-- EternalStorageWrapper
-OverdraftsLedger <|-- EternalStorageWrapper
+ConsolidatedLedger <|-- EternalStorageWrapper
 RoleControl <|-- EternalStorageWrapper
 
 EternalStorageWrapper ..|> EternalStorage

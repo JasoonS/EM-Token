@@ -34,8 +34,8 @@ contract("EMoneyToken", accounts => {
     const userAccount2 = accounts[4]
     const userAccount3 = accounts[3]
     const notary1 = accounts[2]
-    const notWhilisted1 = accounts[1]
-    const notWhilisted2 = accounts[0]
+    const notWhitelisted1 = accounts[1]
+    const notWhitelisted2 = accounts[0]
     const SUSPENSE_WALLET = "0x0000000000000000000000000000000000000000"
     const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
     
@@ -64,11 +64,18 @@ contract("EMoneyToken", accounts => {
 
     it("Compliance check functions for clearable transfers should work", async () => {
         assert.equal(await instance.canOrderClearableTransfer.call(userAccount1, userAccount2, 10), SUCCESS, "Requesting clearable transfers from whitelisted address is not compliant");
-        assert.equal(await instance.canOrderClearableTransfer.call(userAccount1, notWhilisted1, 10), FAILURE, "Requesting clearable transfers from non whitelisted address passess compliance check");
-        assert.equal(await instance.canOrderClearableTransfer.call(notWhilisted1, userAccount1, 10), FAILURE, "Requesting clearable transfers from non whitelisted address passess compliance check");
+        assert.equal(await instance.canOrderClearableTransfer.call(userAccount1, notWhitelisted1, 10), FAILURE, "Requesting clearable transfers from non whitelisted address passess compliance check");
+        assert.equal(await instance.canOrderClearableTransfer.call(notWhitelisted1, userAccount1, 10), FAILURE, "Requesting clearable transfers from non whitelisted address passess compliance check");
         assert.equal(await instance.canApproveToOrderClearableTransfer.call(userAccount2, userAccount3), SUCCESS, "Approving a whitelisted address is not compliant");
-        assert.equal(await instance.canApproveToOrderClearableTransfer.call(userAccount2, notWhilisted2), FAILURE, "Approving a non whitelisted address passes compliance check");
-        assert.equal(await instance.canApproveToOrderClearableTransfer.call(notWhilisted2, userAccount2), FAILURE, "Approving a non whitelisted address passes compliance check");
+        assert.equal(await instance.canApproveToOrderClearableTransfer.call(userAccount2, notWhitelisted2), FAILURE, "Approving a non whitelisted address passes compliance check");
+        assert.equal(await instance.canApproveToOrderClearableTransfer.call(notWhitelisted2, userAccount2), FAILURE, "Approving a non whitelisted address passes compliance check");
+    })
+
+    it("Not whitelisted addresses should not be able to order payouts", async () => {
+        truffleAssert.reverts(instance.orderPayout(CLEARABLE_TRANSFER_ID1, 0, "No particular instructions", {from:notWhitelisted1}), "", "Was able to order payout");
+        truffleAssert.reverts(instance.orderPayout(CLEARABLE_TRANSFER_ID1, 10, "No particular instructions", {from:notWhitelisted1}), "", "Was able to order payout");
+        truffleAssert.reverts(instance.approveToOrderClearableTransfer(userAccount2, {from:notWhitelisted1}), "", "A non whitelisted address was able to approve");
+        await truffleAssert.reverts(instance.approveToOrderClearableTransfer(notWhitelisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
     })
 
     // Checking clearable transfer process
@@ -116,7 +123,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.to, userAccount2, "To not correctly registered");
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 1000, "Amount not correctly registered");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
     });
 
@@ -125,7 +132,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 1000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -1000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 1000, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 1000, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 50000-1000-1000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 0, "Balance not correctly registered");
@@ -146,7 +153,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 150000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 6000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 1000, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 1000, "Total supply on hold not correctly registered");
     })
 
     it("A clearable transfer request should not be able to be ordered twice", async () => {
@@ -201,7 +208,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.to, userAccount2, "To not correctly registered");
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 1000, "Amount not correctly registered");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ReleasedByNotary, "Status not correctly initialized");
     });
 
@@ -210,7 +217,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 1000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -1000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 50000-1000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 0, "Balance not correctly registered");
@@ -231,7 +238,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 150000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 6000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     })
 
     it("Cancelled clearable transfer request should not be able to be reordered, cancelled, processed, executed or rejected", async () => {
@@ -281,7 +288,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.to, userAccount2, "To not correctly registered");
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 10000, "Amount not correctly registered");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
     });
 
@@ -308,7 +315,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.to, userAccount2, "To not correctly registered");
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 10000, "Amount not correctly registered");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
     });
 
@@ -322,7 +329,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 1000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -1000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 10000, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 10000, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 50000-1000-10000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 0, "Balance not correctly registered");
@@ -343,7 +350,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 150000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 6000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 10000, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 10000, "Total supply on hold not correctly registered");
     })
 
     it("Operator should be able to execute a clearable transfer in process", async () => {
@@ -387,7 +394,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.to, userAccount2, "To not correctly registered");
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 10000, "Amount not correctly registered");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ExecutedByNotary, "Status not correctly initialized");
     });
 
@@ -396,7 +403,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 1000+10000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -1000-10000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 50000-1000-10000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 5000, "Balance not correctly registered");
@@ -417,7 +424,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 155000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 11000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     })
 
     it("Executed clearable transfer request should not be able to be reordered, cancelled, processed, executed or rejected", async () => {
@@ -467,7 +474,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 2000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Operator should be able to directly execute a clearable transfer request just ordered", async () => {
@@ -507,7 +514,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.to, userAccount1, "To not correctly registered");
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 2000, "Amount not correctly registered");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ExecutedByNotary, "Status not correctly initialized");
     });
 
@@ -523,7 +530,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 9000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -9000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 41000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 3000, "Balance not correctly registered");
@@ -544,7 +551,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 153000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 9000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     });
 
     it("Nobody should be able to request clearable transfers beyond their available balances", async () => {
@@ -592,7 +599,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 100000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("(Again 3) Operator should be able to put a clearable transfer request in process", async () => {
@@ -619,7 +626,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 100000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Operator should be able to reject a clearable transfer request in process", async () => {
@@ -653,7 +660,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 100000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ReleasedByNotary, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Balances and limits should be correctly registered after rejecting clearable transfer", async () => {
@@ -661,7 +668,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 9000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -9000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 41000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 3000, "Balance not correctly registered");
@@ -682,7 +689,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 153000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 9000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     });
 
     // Transaction #5, directly rejected
@@ -724,7 +731,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 1000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Operator should be able to reject a clearable transfer request just ordered", async () => {
@@ -758,7 +765,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 1000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ReleasedByNotary, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Balances and limits should be correctly registered after executing clearable transfer", async () => {
@@ -766,7 +773,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 9000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -9000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 41000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 3000, "Balance not correctly registered");
@@ -787,14 +794,10 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 153000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 9000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     });
 
     // Transaction #6, ordered through orderClearableTransferFrom and cancelled
-
-    it("Non whitelisted users should not be able to be approved to request funding on behalf of others", async () => {
-        await truffleAssert.reverts(instance.approveToOrderClearableTransfer(notWhilisted1, {from:userAccount2}), "", "Was able to approve a non whitelisted address");
-    });
 
     it("Whitelisted user should be able to approve a whitelisted user to be able to request clearable transfer", async () => {
         tx = await instance.approveToOrderClearableTransfer(userAccount1, {from:userAccount3});
@@ -846,7 +849,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 7000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("No one other than orderer should be able to cancel a clearable transfer request", async () => {
@@ -886,7 +889,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 7000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ReleasedByNotary, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Balances and limits should be correctly registered", async () => {
@@ -894,7 +897,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 9000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -9000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 41000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 3000, "Balance not correctly registered");
@@ -915,7 +918,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 153000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 9000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     })
 
     // Transaction #7, ordered through orderClearableTransferFrom and rejected
@@ -957,7 +960,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 7000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Operator should be able to reject a clearable transfer request in process", async () => {
@@ -991,7 +994,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 7000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ReleasedByNotary, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Balances and limits should be correctly registered", async () => {
@@ -999,7 +1002,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 9000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -9000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 41000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 3000, "Balance not correctly registered");
@@ -1020,7 +1023,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 153000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 9000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     })
 
     // Transaction #8, ordered through orderClearableTransferFrom and executed
@@ -1062,7 +1065,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 7000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.Ordered, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("Operator should be able to execute a clearable transfer request in process", async () => {
@@ -1103,7 +1106,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(_result.notary, ZERO_ADDRESS, "Notary not correctly registered");
         assert.equal(_result.amount, 7000, "Amount not correctly registered");
         assert.equal(_result.status, HoldStatusCode.ExecutedByNotary, "Status not correctly initialized");
-        assert.equal(_result.expires, false, "Amount not correctly registered");
+        assert.equal(_result.expires, false, "Expires not correctly registered");
     });
 
     it("User shold be able to revoke previously approved users to request clearable transfer", async () => {
@@ -1124,7 +1127,7 @@ contract("EMoneyToken", accounts => {
         assert.equal(await instance.drawnAmount.call(userAccount1), 9000, "Drawn amount not correctly registered");
         assert.equal(await instance.netBalanceOf.call(userAccount1), -9000, "Net balance not correctly registered");
         assert.equal(await instance.unsecuredOverdraftLimit.call(userAccount1), 50000, "Wrong overdraft limit set");
-        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong overdraft limit set");
+        assert.equal(await instance.balanceOnHold.call(userAccount1), 0, "Wrong balance on hold");
         assert.equal(await instance.availableFunds.call(userAccount1), 41000, "Available funds not correctly registered");
         
         assert.equal(await instance.balanceOf.call(userAccount2), 10000, "Balance not correctly registered");
@@ -1145,7 +1148,7 @@ contract("EMoneyToken", accounts => {
 
         assert.equal(await instance.totalSupply.call(), 153000, "Total suuply not correctly registered");
         assert.equal(await instance.totalDrawnAmount.call(), 9000, "Total drawn amount not correctly registered");
-        assert.equal(await instance.totalSupplyOnHold.call(), 0, "TOtal supply on hold not correctly registered");
+        assert.equal(await instance.totalSupplyOnHold.call(), 0, "Total supply on hold not correctly registered");
     })
 
 });
